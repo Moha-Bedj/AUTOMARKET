@@ -588,13 +588,13 @@
           <label class="label">Adresse e-mail</label>
           <input type="email" id="l-email" placeholder="exemple@email.com" oninput="clearLoginError()">
         </div>
-        <div id="lfield-tel" class="field hidden">
-          <label class="label">Téléphone</label>
-          <div class="tel-row">
-            <select><option>+213</option></select>
-            <input type="tel" placeholder="00 00 00 00 00" oninput="clearLoginError()">
-          </div>
-        </div>
+       <div class="tel-row">
+  <div style="display:flex;align-items:center;padding:0 10px;border:1px solid #ccc;border-radius:6px;background:#eee;">
+    +213
+  </div>
+<input type="tel" id="r-tel" placeholder="5XXXXXXXX" maxlength="9"
+oninput="validatePhoneInput(this)">
+</div>
 
         <div class="field">
           <label class="label">
@@ -703,18 +703,19 @@
           </div>
 
           <div class="field">
-            <label class="label">Téléphone</label>
-            <div class="tel-row">
-              <select><option>+213</option></select>
-              <input type="tel" placeholder="00 00 00 00 00">
-            </div>
-          </div>
-
+  <label class="label">Téléphone</label>
+  <div class="tel-row">
+    <div style="display:flex;align-items:center;padding:0 10px;border:1px solid #ccc;border-radius:6px;background:#eee;">
+      +213
+    </div>
+    <input type="tel" id="r-tel" placeholder="5XXXXXXXX" maxlength="9" oninput="validatePhoneInput(this)">
+  </div>
+</div>
           <div class="field">
             <label class="label">Wilaya</label>
-            <select>
+            <select id="r-wilaya">
               <option value="">Sélectionner votre wilaya</option>
-              <option value="01">Adrar</option>v>
+              <option value="01">Adrar</option>
               <option value="02">Aïn Defla</option>
               <option value="03">Aïn Témouchent</option>
               <option value="04">Alger</option>
@@ -763,27 +764,32 @@
               <option value="47">Tiaret</option>
               <option value="48">Tindouf</option>
             </select>
+          </div>
            
           <!-- Champs professionnels (masqués par défaut) -->
           <div id="pro-extra" class="hidden">
             <div class="section-label">Informations professionnelles</div>
             <div class="field">
               <label class="label">Nom de l'entreprise</label>
-              <input type="text" placeholder="Ex : Auto Elite Alger">
+              <input type="text" id="pro-nom-entreprise"placeholder="Ex : Auto Elite Alger">
             </div>
             <div class="row2">
               <div>
                 <label class="label">N° RC / NIF</label>
-                <input type="text" placeholder="Registre commerce">
+                <input type="text" id="pro-rc" placeholder="Registre commerce">
               </div>
               <div>
                 <label class="label">Site web</label>
-                <input type="url" placeholder="www.site.dz">
+                <input type="url" id="pro-siteweb" placeholder="www.site.dz">
               </div>
             </div>
           </div>
+          <div id="step1-alert" class="alert hidden" style="margin-top:14px">
+          <div class="alert-icon">!</div>
+          <span id="step1-alert-text">Veuillez remplir tous les champs obligatoires.</span>
+          </div>
 
-          <button class="btn-primary" onclick="goStep(2)">Continuer →</button>
+          <button type="button" class="btn-primary" onclick="goStep(2)">Continuer →</button>
         </div>
 
         <!-- ── ÉTAPE 2 : Sécurité + CGU ── -->
@@ -837,9 +843,13 @@
             <div class="success-icon">✓</div>
             <span>Compte créé ! Un e-mail de vérification a été envoyé.</span>
           </div>
+          <div id="reg-alert" class="alert hidden" style="margin-top:14px">
+          <div class="alert-icon">!</div>
+          <span id="reg-alert-text">Veuillez remplir tous les champs obligatoires.</span>
+          </div>
 
-          <button class="btn-primary" id="reg-btn" onclick="finishReg()">Créer mon compte</button>
-          <button class="btn-ghost" onclick="goStep(1)">← Retour</button>
+          <button type="button" class="btn-primary" id="reg-btn" onclick="finishReg()">Créer mon compte</button>
+          <button type="button" class="btn-ghost" onclick="goStep(1)">← Retour</button>
 
         </div>
       </div>
@@ -915,14 +925,56 @@
       1: 'Étape 1 sur 2 — Informations personnelles',
       2: 'Étape 2 sur 2 — Sécurité & Conditions'
     };
-    function goStep(n) {
-      document.getElementById('reg-step' + currentStep).classList.add('hidden');
-      currentStep = n;
-      document.getElementById('reg-step' + n).classList.remove('hidden');
-      document.getElementById('step-label').textContent = stepLabels[n];
-      document.getElementById('rs1').classList.toggle('off', n < 1);
-      document.getElementById('rs2').classList.toggle('off', n < 2);
+   function goStep(n) {
+  if (n === 2) {
+    const prenom = document.getElementById('r-prenom').value.trim();
+    const nom = document.getElementById('r-nom').value.trim();
+    const email = document.getElementById('r-email').value.trim();
+    const tel = document.getElementById('r-tel').value.trim();
+    const wilaya = document.getElementById('r-wilaya').value;
+
+    const step1Alert = document.getElementById('step1-alert');
+    const step1AlertText = document.getElementById('step1-alert-text');
+
+    const isPro = document.getElementById('rtab-pro').classList.contains('active');
+    const nomEntreprise = document.getElementById('pro-nom-entreprise')?.value.trim() || "";
+    const rc = document.getElementById('pro-rc')?.value.trim() || "";
+
+    step1Alert.classList.add('hidden');
+
+    if (!prenom || !nom || !email || !tel || !wilaya) {
+      step1AlertText.textContent = "Veuillez remplir tous les champs obligatoires.";
+      step1Alert.classList.remove('hidden');
+      return;
     }
+
+    if (!email.includes('@') || !email.includes('.')) {
+      step1AlertText.textContent = "Veuillez saisir une adresse e-mail valide.";
+      step1Alert.classList.remove('hidden');
+      return;
+    }
+
+    const telRegex = /^[567][0-9]{8}$/;
+    if (!telRegex.test(tel)) {
+      step1AlertText.textContent = "Numéro invalide (ex: +213 5XXXXXXXX).";
+      step1Alert.classList.remove('hidden');
+      return;
+    }
+
+    if (isPro && (!nomEntreprise || !rc)) {
+      step1AlertText.textContent = "Veuillez remplir les informations professionnelles obligatoires.";
+      step1Alert.classList.remove('hidden');
+      return;
+    }
+  }
+
+  document.getElementById('reg-step' + currentStep).classList.add('hidden');
+  currentStep = n;
+  document.getElementById('reg-step' + n).classList.remove('hidden');
+  document.getElementById('step-label').textContent = stepLabels[n];
+  document.getElementById('rs1').classList.toggle('off', n < 1);
+  document.getElementById('rs2').classList.toggle('off', n < 2);
+}
 
     /* ── CHECKBOX TOGGLE ─────────────────────────── */
     function toggleChk(id) {
@@ -936,6 +988,20 @@
       inp.type = show ? 'text' : 'password';
       btn.style.color = show ? 'var(--blue)' : 'var(--text-tertiary)';
     }
+    function validatePhoneInput(input) {
+  // Supprimer tout sauf chiffres
+  let value = input.value.replace(/[^0-9]/g, '');
+
+  // Si premier chiffre ≠ 5,6,7 → supprimer
+  if (value.length > 0 && !['5','6','7'].includes(value[0])) {
+    value = value.substring(1);
+  }
+
+  // Limiter à 9 chiffres
+  value = value.substring(0, 9);
+
+  input.value = value;
+}
 
     /* ── LOGIN LOGIC ─────────────────────────────── */
     function clearLoginError() {
@@ -1014,11 +1080,56 @@
       eye.style.color = p1 === p2 ? '#639922' : '#E24B4A';
     }
 
-    /* ── FINISH REGISTRATION ─────────────────────── */
-    function finishReg() {
-      document.getElementById('reg-success').classList.remove('hidden');
-      document.getElementById('reg-btn').disabled = true;
-    }
+   function finishReg() {
+  const prenom = document.getElementById('r-prenom').value.trim();
+  const nom = document.getElementById('r-nom').value.trim();
+  const email = document.getElementById('r-email').value.trim();
+  const pass = document.getElementById('r-pass').value;
+  const pass2 = document.getElementById('r-pass2').value;
+
+  const cguChecked = document.getElementById('chk-cgu').classList.contains('checked');
+
+  const regAlert = document.getElementById('reg-alert');
+  const regAlertText = document.getElementById('reg-alert-text');
+  const regSuccess = document.getElementById('reg-success');
+
+  regAlert.classList.add('hidden');
+  regSuccess.classList.add('hidden');
+
+  if (!prenom || !nom || !email || !pass || !pass2) {
+    regAlertText.textContent = "Veuillez remplir tous les champs obligatoires.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  if (!email.includes('@') || !email.includes('.')) {
+    regAlertText.textContent = "Veuillez saisir une adresse e-mail valide.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  if (pass.length < 8) {
+    regAlertText.textContent = "Le mot de passe doit contenir au moins 8 caractères.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  if (pass !== pass2) {
+    regAlertText.textContent = "Les mots de passe ne correspondent pas.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  if (!cguChecked) {
+    regAlertText.textContent = "Vous devez accepter les conditions générales d'utilisation.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  regSuccess.classList.remove('hidden');
+  document.getElementById('reg-btn').disabled = true;
+  return true;
+}
   </script>
 
 </body>
