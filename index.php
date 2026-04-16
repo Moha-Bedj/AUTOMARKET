@@ -1113,7 +1113,7 @@ while ($row = mysqli_fetch_assoc($r)) {
       </div>
 
       
-      <button class="nav-btn btn-fill"    onclick="location.href='inscription.html'">Connexion</button>
+      <button class="nav-btn btn-fill"    onclick="location.href='inscription.php'">Connexion</button>
     </div>
   </nav>
 
