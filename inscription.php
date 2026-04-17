@@ -1,9 +1,142 @@
 <?php
 session_start();
 require_once 'connexion.php';
-header('Content-Type: application/json');
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json'); /* ← ICI seulement */
 
+    $action = $_POST['action'] ?? '';
+
+    if ($action === 'social') {
+        $email  = trim($_POST['email']  ?? '');
+        $nom    = trim($_POST['nom']    ?? '');
+        $prenom = trim($_POST['prenom'] ?? '');
+        $uid    = trim($_POST['uid']    ?? '');
+        $photo  = trim($_POST['photo']  ?? '');
+
+        if (!$email) {
+            echo json_encode(['success'=>false,'message'=>'Email manquant']);
+            exit;
+        }
+
+        $e   = mysqli_real_escape_string($conn, $email);
+        $res = mysqli_query($conn, "SELECT * FROM Utilisateur WHERE email='$e'");
+
+        if (mysqli_num_rows($res) == 0) {
+            $n    = mysqli_real_escape_string($conn, $nom);
+            $p    = mysqli_real_escape_string($conn, $prenom);
+            $hash = password_hash($uid ?: uniqid(), PASSWORD_DEFAULT);
+            mysqli_query($conn, "INSERT INTO Utilisateur (nom,prenom,email,motDePasse,dateInscription)
+                                 VALUES ('$n','$p','$e','$hash',NOW())");
+            $id = mysqli_insert_id($conn);
+        } else {
+            $user   = mysqli_fetch_assoc($res);
+            $id     = $user['idUtilisateur'];
+            $nom    = $user['nom'];
+            $prenom = $user['prenom'];
+        }
+
+        $_SESSION['idUtilisateur'] = $id;
+        $_SESSION['email']         = $email;
+        $_SESSION['nom']           = $nom;
+        $_SESSION['prenom']        = $prenom;
+        $_SESSION['photo']         = $photo;
+
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    /* ── Inscription normale ── */
+if ($action === 'register') {
+    $email  = trim($_POST['email']  ?? '');
+    $nom    = trim($_POST['nom']    ?? '');
+    $prenom = trim($_POST['prenom'] ?? '');
+    $pass   = $_POST['pass']   ?? '';
+    $tel    = $_POST['tel']    ?? '';
+    $wilaya = $_POST['wilaya'] ?? '';
+
+    if (!$email || !$pass || !$nom || !$prenom) {
+        echo json_encode(['success'=>false,'message'=>'Champs manquants']);
+        exit;
+    }
+
+    $e = mysqli_real_escape_string($conn, $email);
+    $res = mysqli_query($conn, "SELECT idUtilisateur FROM Utilisateur WHERE email='$e'");
+    if (mysqli_num_rows($res) > 0) {
+        echo json_encode(['success'=>false,'message'=>'Email déjà utilisé']);
+        exit;
+    }
+
+    /* Générer un UUID */
+    $id = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+        mt_rand(0,0xffff), mt_rand(0,0xffff),
+        mt_rand(0,0xffff),
+        mt_rand(0,0x0fff) | 0x4000,
+        mt_rand(0,0x3fff) | 0x8000,
+        mt_rand(0,0xffff), mt_rand(0,0xffff), mt_rand(0,0xffff)
+    );
+
+    $hash = password_hash($pass, PASSWORD_DEFAULT);
+    $n    = mysqli_real_escape_string($conn, $nom);
+    $p    = mysqli_real_escape_string($conn, $prenom);
+    $t    = mysqli_real_escape_string($conn, $tel);
+    $w    = mysqli_real_escape_string($conn, $wilaya);
+
+    $ok = mysqli_query($conn, "INSERT INTO Utilisateur 
+        (idUtilisateur, nom, prenom, email, motDePasse, numTel, wilaya, statut, role, dateInscription, emailVerifie, badgeVerifie)
+        VALUES 
+        ('$id', '$n', '$p', '$e', '$hash', '$t', '$w', 'actif', 'utilisateur', CURDATE(), 0, 0)");
+
+    if (!$ok) {
+        echo json_encode(['success'=>false,'message'=>'Erreur SQL : '.mysqli_error($conn)]);
+        exit;
+    }
+
+    $_SESSION['idUtilisateur'] = $id;
+    $_SESSION['email']  = $email;
+    $_SESSION['nom']    = $nom;
+    $_SESSION['prenom'] = $prenom;
+
+    echo json_encode(['success'=>true]);
+    exit;
+}
+
+/* ── Connexion normale ── */
+if ($action === 'login') {
+    $email = trim($_POST['email'] ?? '');
+    $pass  = $_POST['pass'] ?? '';
+
+    if (!$email || !$pass) {
+        echo json_encode(['success'=>false,'message'=>'Champs manquants']);
+        exit;
+    }
+
+    $e   = mysqli_real_escape_string($conn, $email);
+    $res = mysqli_query($conn, "SELECT * FROM Utilisateur WHERE email='$e'");
+
+    if (mysqli_num_rows($res) == 0) {
+        echo json_encode(['success'=>false,'message'=>'Email ou mot de passe incorrect']);
+        exit;
+    }
+
+    $user = mysqli_fetch_assoc($res);
+    if (!password_verify($pass, $user['motDePasse'])) {
+        echo json_encode(['success'=>false,'message'=>'Email ou mot de passe incorrect']);
+        exit;
+    }
+
+    $_SESSION['idUtilisateur'] = $user['idUtilisateur'];
+    $_SESSION['email']         = $user['email'];
+    $_SESSION['nom']           = $user['nom'];
+    $_SESSION['prenom']        = $user['prenom'];
+
+    echo json_encode(['success'=>true]);
+    exit;
+}
+
+    echo json_encode(['success'=>false,'message'=>'Action inconnue']);
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -11,7 +144,6 @@ header('Content-Type: application/json');
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AUTOMARKET — Connexion / Inscription</title>
-  <script type="module" src="firebase.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -645,7 +777,7 @@ oninput="validatePhoneInput(this)">
         <div class="div-line"></div>
       </div>
       <div class="social-grid">
-        <button class="social-btn">
+        <button class="social-btn" onclick="loginGoogle()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -654,7 +786,7 @@ oninput="validatePhoneInput(this)">
           </svg>
           Google
         </button>
-        <button class="social-btn">
+        <button class="social-btn" onclick="loginFacebook()">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="#1877F2">
             <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
           </svg>
@@ -832,20 +964,6 @@ oninput="validatePhoneInput(this)">
             </div>
           </div>
 
-          <div class="section-label" style="margin-top:20px">Conditions</div>
-
-          <div class="check-row">
-            <div class="check checked" id="chk-cgu" onclick="toggleChk('chk-cgu')"></div>
-            <span>
-              J'accepte les <a class="link" href="#">conditions générales d'utilisation</a>
-              et la <a class="link" href="#">politique de confidentialité</a> d'AUTOMARKET
-            </span>
-          </div>
-          <div class="check-row">
-            <div class="check" id="chk-alertes" onclick="toggleChk('chk-alertes')"></div>
-            <span>Recevoir des alertes sur les nouvelles annonces correspondant à mes critères</span>
-          </div>
-
           <div id="reg-success" class="success-box hidden" style="margin-top:14px">
             <div class="success-icon">✓</div>
             <span>Compte créé ! Un e-mail de vérification a été envoyé.</span>
@@ -861,28 +979,7 @@ oninput="validatePhoneInput(this)">
         </div>
       </div>
 
-      <div class="divider">
-        <div class="div-line"></div>
-        <div class="div-text">ou s'inscrire avec</div>
-        <div class="div-line"></div>
-      </div>
-      <div class="social-grid">
-        <button class="social-btn">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-          </svg>
-          Google
-        </button>
-        <button class="social-btn">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="#1877F2">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-          </svg>
-          Facebook
-        </button>
-      </div>
+      
 
       <div class="footer-link-row">
         Déjà inscrit ?
@@ -891,8 +988,7 @@ oninput="validatePhoneInput(this)">
     </div>
 
     <div class="page-footer">
-      © 2025 AUTOMARKET — Marketplace automobile algérienne &nbsp;·&nbsp;
-      <span>Aide</span> &nbsp;·&nbsp; <span>Confidentialité</span>
+      © 2026 AUTOMARKET — Marketplace automobile algérienne &nbsp;·&nbsp;
     </div>
 
   </div><!-- end page-body -->
@@ -940,6 +1036,7 @@ oninput="validatePhoneInput(this)">
     const tel = document.getElementById('r-tel').value.trim();
     const wilaya = document.getElementById('r-wilaya').value;
 
+
     const step1Alert = document.getElementById('step1-alert');
     const step1AlertText = document.getElementById('step1-alert-text');
 
@@ -949,7 +1046,7 @@ oninput="validatePhoneInput(this)">
 
     step1Alert.classList.add('hidden');
 
-    if (!prenom || !nom || !email || !tel || !wilaya) {
+    if (!prenom || !nom || !email || !wilaya) {
       step1AlertText.textContent = "Veuillez remplir tous les champs obligatoires.";
       step1Alert.classList.remove('hidden');
       return;
@@ -962,7 +1059,7 @@ oninput="validatePhoneInput(this)">
     }
 
     const telRegex = /^[567][0-9]{8}$/;
-    if (!telRegex.test(tel)) {
+    if (tel && !telRegex.test(tel)) {
       step1AlertText.textContent = "Numéro invalide (ex: +213 5XXXXXXXX).";
       step1Alert.classList.remove('hidden');
       return;
@@ -1023,7 +1120,7 @@ oninput="validatePhoneInput(this)">
   if (!email || !pass) {
     document.getElementById('l-pass').classList.add('error');
     document.getElementById('login-alert').classList.remove('hidden');
-    document.getElementById('login-alert-text').textContent = 'Veuillez remplir tous les champs.';
+    document.getElementById('login-alert-text').textContent = 'Remplissez tous les champs.';
     return;
   }
 
@@ -1032,7 +1129,7 @@ oninput="validatePhoneInput(this)">
   fd.append('email',  email);
   fd.append('pass',   pass);
 
-  fetch('inscription.php', { method:'POST', body:fd })
+  fetch('inscription.php', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(json => {
       if (json.success) {
@@ -1050,10 +1147,13 @@ oninput="validatePhoneInput(this)">
           document.getElementById('l-count').textContent = loginAttempts;
         } else {
           document.getElementById('l-btn').disabled = true;
-          document.getElementById('l-attempts').classList.add('hidden');
           loginAttempts = 3;
         }
       }
+    })
+    .catch(err => {
+      document.getElementById('login-alert').classList.remove('hidden');
+      document.getElementById('login-alert-text').textContent = 'Erreur réseau : ' + err.message;
     });
 }
 
@@ -1103,17 +1203,22 @@ oninput="validatePhoneInput(this)">
   const wilaya = document.getElementById('r-wilaya').value;
   const pass   = document.getElementById('r-pass').value;
   const pass2  = document.getElementById('r-pass2').value;
-  const cgu    = document.getElementById('chk-cgu').classList.contains('checked');
 
-  const regAlert    = document.getElementById('reg-alert');
-  const regAlertText= document.getElementById('reg-alert-text');
-  const regSuccess  = document.getElementById('reg-success');
+  const regAlert     = document.getElementById('reg-alert');
+  const regAlertText = document.getElementById('reg-alert-text');
+  const regSuccess   = document.getElementById('reg-success');
 
   regAlert.classList.add('hidden');
   regSuccess.classList.add('hidden');
 
+  /* ── Validations ── */
   if (!prenom || !nom || !email || !pass || !pass2) {
-    regAlertText.textContent = "Veuillez remplir tous les champs.";
+    regAlertText.textContent = "Remplissez tous les champs obligatoires.";
+    regAlert.classList.remove('hidden');
+    return;
+  }
+  if (!email.includes('@') || !email.includes('.')) {
+    regAlertText.textContent = "E-mail invalide.";
     regAlert.classList.remove('hidden');
     return;
   }
@@ -1127,12 +1232,8 @@ oninput="validatePhoneInput(this)">
     regAlert.classList.remove('hidden');
     return;
   }
-  if (!cgu) {
-    regAlertText.textContent = "Vous devez accepter les conditions.";
-    regAlert.classList.remove('hidden');
-    return;
-  }
 
+  /* ── Envoyer au PHP ── */
   const fd = new FormData();
   fd.append('action',  'register');
   fd.append('email',   email);
@@ -1142,7 +1243,7 @@ oninput="validatePhoneInput(this)">
   fd.append('tel',     tel);
   fd.append('wilaya',  wilaya);
 
-  fetch('inscription.php', { method:'POST', body:fd })
+  fetch('inscription.php', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(json => {
       if (json.success) {
@@ -1153,9 +1254,14 @@ oninput="validatePhoneInput(this)">
         regAlertText.textContent = json.message || 'Erreur serveur';
         regAlert.classList.remove('hidden');
       }
+    })
+    .catch(err => {
+      regAlertText.textContent = 'Erreur réseau : ' + err.message;
+      regAlert.classList.remove('hidden');
     });
 }
 </script>
+<script type="module" src="firebase.js"></script>
 
 </body>
 </html>

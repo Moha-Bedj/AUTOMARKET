@@ -1,5 +1,7 @@
 <?php
+session_start();
 require_once 'connexion.php';
+
 $counts_type = ['voiture' => 0, 'moto' => 0, 'camion' => 0];
 
 $r = mysqli_query($conn, "
@@ -132,16 +134,7 @@ while ($row = mysqli_fetch_assoc($r)) {
       align-items: center;
       margin-left: auto;
     }
-    .nav-link {
-      font-size: 13px;
-      color: var(--t2);
-      cursor: pointer;
-      padding: 5px 10px;
-      border-radius: var(--r6);
-      transition: background .15s, color .15s;
-      text-decoration: none;
-    }
-    .nav-link:hover { background: var(--bg1); color: var(--t1); }
+    
 
     .nav-btn {
       font-size: 13px;
@@ -958,7 +951,62 @@ while ($row = mysqli_fetch_assoc($r)) {
     }
     .footer a { color: var(--blue); text-decoration: none; }
     .footer a:hover { text-decoration: underline; }
-    
+    .user-menu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.user-menu:hover { background: var(--bg1); }
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0.5px solid var(--bd);
+}
+
+.user-avatar-initial {
+  background: var(--blue);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+.dropdown {
+  position: absolute;
+  right: 20px;
+  top: 48px;
+  background: #fff;
+  border: 0.5px solid var(--bd);
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 160px;
+  z-index: 200;
+}
+.dropdown-item {
+  display: block;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--t1);
+  text-decoration: none;
+  transition: background .15s;
+}
+.dropdown-item:hover {
+  background: var(--bg1);
+}
 
   @media (max-width: 600px) {
     #logo-id{
@@ -967,7 +1015,6 @@ while ($row = mysqli_fetch_assoc($r)) {
 
     /* Cache la navbar search et les liens */
     .nav-search { display: none; }
-    .nav-link { display: none; }
     .nav-fav { display: none; }
     .nav { padding: 0 16px; justify-content: space-between; }
 
@@ -1091,6 +1138,8 @@ while ($row = mysqli_fetch_assoc($r)) {
     </a>
 
     <div class="nav-search">
+   
+
       <svg class="nav-search-icon" width="14" height="14" viewBox="0 0 24 24"
            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -1100,21 +1149,58 @@ while ($row = mysqli_fetch_assoc($r)) {
     
 
     <div class="nav-links">
-      <a class="nav-link" href="#">Annonces</a>
-      <a class="nav-link" href="#">Vendre</a>
-      <a class="nav-link" href="#">Estimateur</a>
+       <div class="nav-fav" title="Notifications">
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" 
+         fill="currentColor" viewBox="0 0 24 24">
+      <path d="M19 12.59V10c0-3.22-2.18-5.93-5.14-6.74C13.57 2.52 12.85 2 12 2s-1.56.52-1.86 1.26C7.18 4.08 5 6.79 5 10v2.59L3.29 14.3a1 1 0 0 0-.29.71v2c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-2c0-.27-.11-.52-.29-.71zM19 16H5v-.59l1.71-1.71a1 1 0 0 0 .29-.71v-3c0-2.76 2.24-5 5-5s5 2.24 5 5v3c0 .27.11.52.29.71L19 15.41zm-4.18 4H9.18c.41 1.17 1.51 2 2.82 2s2.41-.83 2.82-2"/>
+    </svg>
+  </div>
 
       <div class="nav-fav" title="Mes favoris">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-        </svg>
+        <svg  xmlns="http://www.w3.org/2000/svg" width="22" height="22"  
+fill="currentColor" viewBox="0 0 24 24" >
+<!--Boxicons v3.0.8 https://boxicons.com | License  https://docs.boxicons.com/free-->
+<path d="M11.29 20.66c.2.2.45.29.71.29s.51-.1.71-.29l7.5-7.5c2.35-2.35 2.35-6.05 0-8.41-2.3-2.28-5.85-2.35-8.21-.2-2.36-2.15-5.91-2.09-8.21.2-2.35 2.36-2.35 6.06 0 8.41zM5.21 6.16C6 5.38 7 4.99 8.01 4.99s2.01.39 2.79 1.17l.5.5c.39.39 1.02.39 1.41 0l.5-.5c1.56-1.56 4.02-1.56 5.59 0 1.56 1.57 1.56 4.02 0 5.58l-6.79 6.79-6.79-6.79a3.91 3.91 0 0 1 0-5.58Z"></path>
+</svg>
         <!--<div class="nav-badge"></div>-->
       </div>
 
       
-      <button class="nav-btn btn-fill"    onclick="location.href='inscription.php'">Connexion</button>
-    </div>
+<?php if (isset($_SESSION['idUtilisateur'])): ?>
+  <div class="user-menu">
+    
+    
+      <?php if (isset($_SESSION['idUtilisateur'])): ?>
+  <div class="user-menu" onclick="toggleMenu()">
+    <?php if (!empty($_SESSION['photo'])): ?>
+  <img src="<?= htmlspecialchars($_SESSION['photo']) ?>" 
+       class="user-avatar" 
+       alt=""
+       referrerpolicy="no-referrer"
+       onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+  <div class="user-avatar user-avatar-initial" style="display:none">
+    <?= strtoupper(substr($_SESSION['prenom'] ?? 'U', 0, 1)) ?>
+  </div>
+<?php else: ?>
+  <div class="user-avatar user-avatar-initial">
+    <?= strtoupper(substr($_SESSION['prenom'] ?? 'U', 0, 1)) ?>
+  </div>
+<?php endif; ?>
+    <span class="user-name"><?= htmlspecialchars($_SESSION['prenom']) ?></span>
+  </div>
+
+  <!-- Menu dropdown -->
+  <div id="user-dropdown" class="dropdown" style="display:none">
+    <a href="profil.php" class="dropdown-item">Mon profil</a>
+    <a href="mes_annonces.php" class="dropdown-item">Mes annonces</a>
+    <a href="favoris.php" class="dropdown-item">Mes favoris</a>
+    <hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
+    <a href="deconnexion.php" class="dropdown-item" style="color:var(--red)">Se déconnecter</a>
+  </div>
+<?php endif; ?>
+<?php else: ?>
+  <button class="nav-btn btn-fill" onclick="location.href='inscription.php'">Connexion</button>
+<?php endif; ?>    </div>
   </nav>
 
   <!-- ══════════════════════════════════════════
@@ -1785,7 +1871,18 @@ while ($row = mysqli_fetch_assoc($r)) {
         }
       });
     });
-  </script>
+    function toggleMenu() {
+  const d = document.getElementById('user-dropdown');
+  d.style.display = d.style.display === 'none' ? 'block' : 'none';
+}
 
+/* Fermer si on clique ailleurs */
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.user-menu') && !e.target.closest('#user-dropdown')) {
+    const d = document.getElementById('user-dropdown');
+    if (d) d.style.display = 'none';
+  }
+});
+  </script>
 </body>
 </html>
