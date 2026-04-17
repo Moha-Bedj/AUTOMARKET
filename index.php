@@ -1195,7 +1195,7 @@ while ($row = mysqli_fetch_assoc($r)) {
 
   <!-- Menu dropdown -->
   <div id="user-dropdown" class="dropdown" style="display:none">
-    <a href="profil.php" class="dropdown-item">Mon profil</a>
+    <a href="monprofil.php" class="dropdown-item">Mon profil</a>
     <a href="mes_annonces.php" class="dropdown-item">Mes annonces</a>
     <a href="favoris.php" class="dropdown-item">Mes favoris</a>
     <hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
