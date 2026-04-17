@@ -11,19 +11,28 @@ $idUtilisateur = $_SESSION['idUtilisateur'];
 
 $sql = "
     SELECT 
-        idUtilisateur,
-        nom,
-        prenom,
-        email,
-        numTel,
-        statut,
-        role,
-        dateInscription,
-        emailVerifie,
-        badgeVerifie
-    FROM Utilisateur
-    WHERE idUtilisateur = ?
-    LIMIT 1
+        a.idAnnonce,
+        a.titre,
+        a.prix,
+        a.localisation,
+        a.datePublication,
+        a.dateModification,
+        a.statutAnnonce,
+        v.annee,
+        v.kilometrage,
+        v.carburant,
+        v.transmission,
+        (
+            SELECT p.urlPhoto
+            FROM Photos p
+            WHERE p.idAnnonce = a.idAnnonce
+            ORDER BY p.ordrePhoto ASC, p.idPhoto ASC
+            LIMIT 1
+        ) AS photo
+    FROM Annonce a
+    INNER JOIN Vehicule v ON a.idVehicule = v.idVehicule
+    WHERE a.idVendeur = ?
+    ORDER BY a.datePublication DESC
 ";
 
 $stmt = mysqli_prepare($conn, $sql);
@@ -31,29 +40,16 @@ mysqli_stmt_bind_param($stmt, "s", $idUtilisateur);
 mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
 
-if (!$result || mysqli_num_rows($result) === 0) {
-    die("Utilisateur introuvable.");
-}
-
-$user = mysqli_fetch_assoc($result);
-
-$prenom = htmlspecialchars($user['prenom'] ?? '');
-$nom = htmlspecialchars($user['nom'] ?? '');
-$email = htmlspecialchars($user['email'] ?? '');
-$tel = htmlspecialchars($user['numTel'] ?? '');
-$statut = htmlspecialchars($user['statut'] ?? '');
-$role = htmlspecialchars($user['role'] ?? '');
-$dateInscription = !empty($user['dateInscription']) ? date('d/m/Y', strtotime($user['dateInscription'])) : '-';
-$emailVerifie = !empty($user['emailVerifie']);
-$badgeVerifie = !empty($user['badgeVerifie']);
-$initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
+$totalAnnonces = mysqli_num_rows($result);
+$prenom = htmlspecialchars($_SESSION['prenom'] ?? 'Utilisateur');
+$initiale = strtoupper(substr($_SESSION['prenom'] ?? 'U', 0, 1));
 ?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mon profil — AUTOMARKET</title>
+  <title>Mes annonces — AUTOMARKET</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -76,6 +72,9 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
       --red:        #E24B4A;
       --red-bg:     #FCEBEB;
       --red-bd:     #F7C1C1;
+      --amber:      #BA7517;
+      --amber-bg:   #FAEEDA;
+      --amber-bd:   #FAC775;
       --r6: 6px;
       --r8: 8px;
       --r10: 10px;
@@ -176,15 +175,10 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
 
     .user-menu:hover { background: var(--bg1); }
 
-    .user-avatar {
+    .user-avatar-initial {
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      object-fit: cover;
-      border: 0.5px solid var(--bd);
-    }
-
-    .user-avatar-initial {
       background: var(--blue);
       color: #fff;
       display: flex;
@@ -192,7 +186,6 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
       justify-content: center;
       font-size: 14px;
       font-weight: 500;
-      border: none;
     }
 
     .user-name {
@@ -258,149 +251,17 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
 
     .back-link:hover { text-decoration: underline; }
 
-    .profile-layout {
-      display: grid;
-      grid-template-columns: 300px 1fr;
-      gap: 20px;
-    }
-
-    .card {
-      background: var(--bg0);
-      border: 0.5px solid var(--bd);
-      border-radius: var(--r10);
-      overflow: hidden;
-    }
-
-    .profile-card {
-      padding: 20px;
-      text-align: center;
-    }
-
-    .profile-avatar {
-      width: 88px;
-      height: 88px;
-      border-radius: 50%;
-      background: var(--blue);
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 30px;
-      font-weight: 500;
-      margin: 0 auto 14px;
-    }
-
-    .profile-name {
-      font-size: 20px;
-      font-weight: 500;
-      margin-bottom: 4px;
-    }
-
-    .profile-role {
-      font-size: 13px;
-      color: var(--t2);
-      margin-bottom: 14px;
-    }
-
-    .badge-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: center;
-    }
-
-    .badge {
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      border: 0.5px solid;
-    }
-
-    .badge-ok {
-      background: var(--green-bg);
-      color: var(--green-dk);
-      border-color: var(--green-bd);
-    }
-
-    .badge-no {
-      background: var(--red-bg);
-      color: #791F1F;
-      border-color: var(--red-bd);
-    }
-
-    .info-card {
-      padding: 0;
-    }
-
-    .info-head {
-      padding: 16px 18px;
-      border-bottom: 0.5px solid var(--bd);
-      font-size: 15px;
-      font-weight: 500;
-    }
-
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .info-item {
-      padding: 16px 18px;
-      border-bottom: 0.5px solid var(--bd);
-    }
-
-    .info-item:nth-child(odd) {
-      border-right: 0.5px solid var(--bd);
-    }
-
-    .info-label {
-      font-size: 12px;
-      color: var(--t3);
-      margin-bottom: 6px;
-    }
-
-    .info-value {
-      font-size: 14px;
-      color: var(--t1);
-      font-weight: 500;
-      word-break: break-word;
-    }
-
-    .actions-card {
-      margin-top: 20px;
-      padding: 16px 18px;
-    }
-
-    .actions-title {
-      font-size: 15px;
-      font-weight: 500;
-      margin-bottom: 12px;
-    }
-
-    .actions-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .btn {
-      height: 38px;
-      padding: 0 14px;
-      border-radius: var(--r8);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-family: inherit;
-    }
-
     .btn-fill {
       background: var(--blue);
       color: #fff;
       border: none;
+      border-radius: var(--r6);
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
     }
 
     .btn-fill:hover { background: var(--blue-dk); }
@@ -409,10 +270,184 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
       background: transparent;
       color: var(--blue);
       border: 0.5px solid var(--blue);
+      border-radius: var(--r6);
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
     }
 
-    .btn-outline:hover {
-      background: var(--blue-bg);
+    .btn-outline:hover { background: var(--blue-bg); }
+
+    .empty-box {
+      background: var(--bg0);
+      border: 0.5px solid var(--bd);
+      border-radius: var(--r10);
+      padding: 40px 24px;
+      text-align: center;
+    }
+
+    .empty-box h2 {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .empty-box p {
+      font-size: 13px;
+      color: var(--t2);
+      margin-bottom: 18px;
+    }
+
+    .listings {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .lcard {
+      background: var(--bg0);
+      border: 0.5px solid var(--bd);
+      border-radius: var(--r10);
+      display: flex;
+      overflow: hidden;
+      transition: border-color .15s, box-shadow .15s;
+    }
+
+    .lcard:hover {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 2px rgba(24,95,165,.08);
+    }
+
+    .lcard-img {
+      width: 220px;
+      flex-shrink: 0;
+      background: var(--bg1);
+      position: relative;
+      height: 160px;
+      overflow: hidden;
+    }
+
+    .lcard-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .lcard-img-ph {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--t3);
+    }
+
+    .status-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 20px;
+      border: 0.5px solid;
+      background: #fff;
+    }
+
+    .status-active {
+      background: var(--green-bg);
+      color: var(--green-dk);
+      border-color: var(--green-bd);
+    }
+
+    .status-pending {
+      background: #FAEEDA;
+      color: #7A4A00;
+      border-color: #F1C56A;
+    }
+
+    .status-other {
+      background: var(--red-bg);
+      color: #791F1F;
+      border-color: var(--red-bd);
+    }
+
+    .lcard-body {
+      flex: 1;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .lcard-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .lcard-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--t1);
+      text-decoration: none;
+    }
+
+    .lcard-title:hover { color: var(--blue); }
+
+    .lcard-price {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--blue);
+      white-space: nowrap;
+    }
+
+    .lcard-specs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .lspec {
+      font-size: 12px;
+      color: var(--t2);
+    }
+
+    .lspec-dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--t3);
+      flex-shrink: 0;
+    }
+
+    .lcard-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 0.5px solid var(--bd);
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ldate {
+      font-size: 11px;
+      color: var(--t3);
+    }
+
+    .actions-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
     }
 
     .footer {
@@ -435,14 +470,10 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
     @media (max-width: 800px) {
       #logo-id { display: none; }
       .nav-search { display: none; }
-      .profile-layout {
-        grid-template-columns: 1fr;
-      }
-      .info-grid {
-        grid-template-columns: 1fr;
-      }
-      .info-item:nth-child(odd) {
-        border-right: none;
+      .lcard { flex-direction: column; }
+      .lcard-img {
+        width: 100%;
+        height: 200px;
       }
       .page-title {
         font-size: 20px;
@@ -474,7 +505,7 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
       </a>
 
       <div class="user-menu" onclick="toggleMenu()">
-        <div class="user-avatar user-avatar-initial"><?= $initiale ?></div>
+        <div class="user-avatar-initial"><?= $initiale ?></div>
         <span class="user-name"><?= $prenom ?></span>
       </div>
 
@@ -491,79 +522,99 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
   <div class="page-wrap">
     <div class="page-head">
       <div>
-        <h1 class="page-title">Mon profil</h1>
-        <div class="page-sub">Consultez vos informations personnelles</div>
+        <h1 class="page-title">Mes annonces</h1>
+        <div class="page-sub"><?= $totalAnnonces ?> annonce<?= $totalAnnonces > 1 ? 's' : '' ?> publiée<?= $totalAnnonces > 1 ? 's' : '' ?></div>
       </div>
       <a href="index.php" class="back-link">← Retour à l’accueil</a>
     </div>
 
-    <div class="profile-layout">
-      <div>
-        <div class="card profile-card">
-          <div class="profile-avatar"><?= $initiale ?></div>
-          <div class="profile-name"><?= $prenom . ' ' . $nom ?></div>
-          <div class="profile-role"><?= ucfirst($role ?: 'Utilisateur') ?></div>
-
-          <div class="badge-row">
-            <span class="badge <?= $emailVerifie ? 'badge-ok' : 'badge-no' ?>">
-              <?= $emailVerifie ? 'Email vérifié' : 'Email non vérifié' ?>
-            </span>
-            <span class="badge <?= $badgeVerifie ? 'badge-ok' : 'badge-no' ?>">
-              <?= $badgeVerifie ? 'Badge vérifié' : 'Badge non vérifié' ?>
-            </span>
-          </div>
-        </div>
+    <?php if ($totalAnnonces == 0): ?>
+      <div class="empty-box">
+        <h2>Aucune annonce postée</h2>
+        <p>Vous n’avez encore publié aucune annonce. Commencez dès maintenant en déposant votre premier véhicule.</p>
+        <a href="publier.php" class="btn-fill">Poster une annonce</a>
       </div>
+    <?php else: ?>
+      <div class="listings">
+        <?php while ($a = mysqli_fetch_assoc($result)): ?>
+          <?php
+            $titre = htmlspecialchars($a['titre']);
+            $prix = number_format($a['prix'], 0, ',', ' ');
+            $loc = htmlspecialchars($a['localisation']);
+            $km = number_format($a['kilometrage'], 0, ',', ' ');
+            $annee = htmlspecialchars($a['annee']);
+            $carbu = htmlspecialchars($a['carburant']);
+            $trans = htmlspecialchars($a['transmission']);
+            $photo = !empty($a['photo']) ? htmlspecialchars($a['photo']) : '';
+            $statut = strtolower(trim($a['statutAnnonce'] ?? ''));
 
-      <div>
-        <div class="card info-card">
-          <div class="info-head">Informations du compte</div>
-          <div class="info-grid">
-            <div class="info-item">
-              <div class="info-label">Prénom</div>
-              <div class="info-value"><?= $prenom ?: '-' ?></div>
+            if ($statut === 'active') {
+                $statusClass = 'status-active';
+                $statusText = 'Active';
+            } elseif ($statut === 'en_attente') {
+                $statusClass = 'status-pending';
+                $statusText = 'En attente';
+            } else {
+                $statusClass = 'status-other';
+                $statusText = ucfirst($statut ?: 'Inconnue');
+            }
+
+            $date = new DateTime($a['datePublication']);
+            $diff = (new DateTime())->diff($date)->days;
+            if ($diff == 0) {
+                $dl = "Aujourd'hui";
+            } elseif ($diff == 1) {
+                $dl = "Hier";
+            } else {
+                $dl = "Il y a $diff jours";
+            }
+          ?>
+          <div class="lcard">
+            <div class="lcard-img">
+              <div class="status-badge <?= $statusClass ?>"><?= $statusText ?></div>
+
+              <?php if ($photo): ?>
+                <img src="<?= $photo ?>" alt="<?= $titre ?>">
+              <?php else: ?>
+                <div class="lcard-img-ph">
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.8">
+                    <rect x="1" y="6" width="22" height="13" rx="3"/>
+                    <circle cx="7" cy="16" r="1.5"/><circle cx="17" cy="16" r="1.5"/>
+                  </svg>
+                </div>
+              <?php endif; ?>
             </div>
-            <div class="info-item">
-              <div class="info-label">Nom</div>
-              <div class="info-value"><?= $nom ?: '-' ?></div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Adresse e-mail</div>
-              <div class="info-value"><?= $email ?: '-' ?></div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Téléphone</div>
-              <div class="info-value"><?= $tel ?: '-' ?></div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Rôle</div>
-              <div class="info-value"><?= $role ?: '-' ?></div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Statut</div>
-              <div class="info-value"><?= $statut ?: '-' ?></div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Inscrit depuis</div>
-              <div class="info-value"><?= $dateInscription ?></div>
-            </div>
-            <div class="info-item">
-              <div class="info-label">Identifiant</div>
-              <div class="info-value"><?= htmlspecialchars($user['idUtilisateur']) ?></div>
+
+            <div class="lcard-body">
+              <div class="lcard-top">
+                <a href="fiche_annonce.php?id=<?= urlencode($a['idAnnonce']) ?>" class="lcard-title"><?= $titre ?></a>
+                <div class="lcard-price"><?= $prix ?> DA</div>
+              </div>
+
+              <div class="lcard-specs">
+                <span class="lspec"><?= $annee ?></span>
+                <span class="lspec-dot"></span>
+                <span class="lspec"><?= $km ?> km</span>
+                <span class="lspec-dot"></span>
+                <span class="lspec"><?= $carbu ?></span>
+                <span class="lspec-dot"></span>
+                <span class="lspec"><?= $trans ?></span>
+                <span class="lspec-dot"></span>
+                <span class="lspec"><?= $loc ?></span>
+              </div>
+
+              <div class="lcard-foot">
+                <div class="ldate">Publiée <?= $dl ?></div>
+                <div class="actions-row">
+                  <a href="fiche_annonce.php?id=<?= urlencode($a['idAnnonce']) ?>" class="btn-outline">Voir</a>
+                  <a href="modifier_annonce.php?id=<?= urlencode($a['idAnnonce']) ?>" class="btn-outline">Modifier</a>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-
-        <div class="card actions-card">
-          <div class="actions-title">Actions rapides</div>
-          <div class="actions-row">
-            <a href="favoris.php" class="btn btn-outline">Mes favoris</a>
-            <a href="mesannonces.php" class="btn btn-outline">Mes annonces</a>
-            <a href="deconnexion.php" class="btn btn-fill">Se déconnecter</a>
-          </div>
-        </div>
+        <?php endwhile; ?>
       </div>
-    </div>
+    <?php endif; ?>
   </div>
 
   <footer class="footer">
