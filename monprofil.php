@@ -458,32 +458,17 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
       <img src="images/id.png" alt="" style="height:34px;width:auto;display:block;" id="logo-id">
     </a>
 
-    <div class="nav-search">
-      <svg class="nav-search-icon" width="14" height="14" viewBox="0 0 24 24"
-           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-      </svg>
-      <input type="text" placeholder="Rechercher…">
-    </div>
+   
 
-    <div class="nav-links">
-      <a class="nav-fav" href="favoris.php" title="Mes favoris">
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M11.29 20.66c.2.2.45.29.71.29s.51-.1.71-.29l7.5-7.5c2.35-2.35 2.35-6.05 0-8.41-2.3-2.28-5.85-2.35-8.21-.2-2.36-2.15-5.91-2.09-8.21.2-2.35 2.36-2.35 6.06 0 8.41z"></path>
-        </svg>
-      </a>
-
-      <div class="user-menu" onclick="toggleMenu()">
-        <div class="user-avatar user-avatar-initial"><?= $initiale ?></div>
-        <span class="user-name"><?= $prenom ?></span>
-      </div>
+   
 
       <div id="user-dropdown" class="dropdown" style="display:none">
         <a href="monprofil.php" class="dropdown-item">Mon profil</a>
         <a href="mesannonces.php" class="dropdown-item">Mes annonces</a>
         <a href="favoris.php" class="dropdown-item">Mes favoris</a>
         <hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
-        <a href="deconnexion.php" class="dropdown-item" style="color:var(--red)">Se déconnecter</a>
+        <button class="btn btn-fill" onclick="openLogoutModal()">Se déconnecter</button>
+    
       </div>
     </div>
   </nav>
@@ -572,12 +557,22 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
     <a href="#">Confidentialité</a> &nbsp;·&nbsp;
     <a href="#">Conditions d'utilisation</a>
   </footer>
-
   <script>
     function toggleMenu() {
       const d = document.getElementById('user-dropdown');
       d.style.display = d.style.display === 'none' ? 'block' : 'none';
     }
+    function openLogoutModal() {
+  document.getElementById('logout-modal').style.display = 'flex';
+}
+
+function closeLogoutModal() {
+  document.getElementById('logout-modal').style.display = 'none';
+}
+
+function logout() {
+  window.location.href = 'deconnexion.php';
+}
 
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.user-menu') && !e.target.closest('#user-dropdown')) {
@@ -586,5 +581,25 @@ $initiale = strtoupper(substr($user['prenom'] ?? 'U', 0, 1));
       }
     });
   </script>
+  <div id="logout-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:999;">
+  <div style="background:#fff; padding:20px 24px; border-radius:10px; width:300px; text-align:center;">
+    
+    <h3 style="margin-bottom:10px;">Déconnexion</h3>
+    <p style="font-size:13px; color:#555; margin-bottom:20px;">
+      Êtes-vous sûr de vouloir vous déconnecter ?
+    </p>
+
+    <div style="display:flex; gap:10px; justify-content:center;">
+      <button onclick="logout()" style="padding:8px 14px; background:#185FA5; color:#fff; border:none; border-radius:6px; cursor:pointer;">
+        Oui
+      </button>
+
+      <button onclick="closeLogoutModal()" style="padding:8px 14px; background:#eee; border:none; border-radius:6px; cursor:pointer;">
+        Non
+      </button>
+    </div>
+
+  </div>
+</div>
 </body>
 </html>
