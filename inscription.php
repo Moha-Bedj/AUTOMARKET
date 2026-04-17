@@ -731,7 +731,11 @@ if ($action === 'login') {
   <div style="display:flex;align-items:center;padding:0 10px;border:1px solid #ccc;border-radius:6px;background:#eee;">
     +213
   </div>
+<<<<<<< HEAD:inscription.php
 <input type="tel" id="l-tel" placeholder="5XXXXXXXX" maxlength="9"
+=======
+<input type="tel" id="r-tel" placeholder="5XXXXXXXX" maxlength="9"
+>>>>>>> publier-annonce:inscription.html
 oninput="validatePhoneInput(this)">
 </div>
 
@@ -1036,7 +1040,10 @@ oninput="validatePhoneInput(this)">
     const tel = document.getElementById('r-tel').value.trim();
     const wilaya = document.getElementById('r-wilaya').value;
 
+<<<<<<< HEAD:inscription.php
 
+=======
+>>>>>>> publier-annonce:inscription.html
     const step1Alert = document.getElementById('step1-alert');
     const step1AlertText = document.getElementById('step1-alert-text');
 
@@ -1046,7 +1053,11 @@ oninput="validatePhoneInput(this)">
 
     step1Alert.classList.add('hidden');
 
+<<<<<<< HEAD:inscription.php
     if (!prenom || !nom || !email || !wilaya) {
+=======
+    if (!prenom || !nom || !email || !tel || !wilaya) {
+>>>>>>> publier-annonce:inscription.html
       step1AlertText.textContent = "Veuillez remplir tous les champs obligatoires.";
       step1Alert.classList.remove('hidden');
       return;
@@ -1059,7 +1070,11 @@ oninput="validatePhoneInput(this)">
     }
 
     const telRegex = /^[567][0-9]{8}$/;
+<<<<<<< HEAD:inscription.php
     if (tel && !telRegex.test(tel)) {
+=======
+    if (!telRegex.test(tel)) {
+>>>>>>> publier-annonce:inscription.html
       step1AlertText.textContent = "Numéro invalide (ex: +213 5XXXXXXXX).";
       step1Alert.classList.remove('hidden');
       return;
@@ -1197,6 +1212,7 @@ oninput="validatePhoneInput(this)">
 
    function finishReg() {
   const prenom = document.getElementById('r-prenom').value.trim();
+<<<<<<< HEAD:inscription.php
   const nom    = document.getElementById('r-nom').value.trim();
   const email  = document.getElementById('r-email').value.trim();
   const tel    = document.getElementById('r-tel').value.trim();
@@ -1207,10 +1223,23 @@ oninput="validatePhoneInput(this)">
   const regAlert     = document.getElementById('reg-alert');
   const regAlertText = document.getElementById('reg-alert-text');
   const regSuccess   = document.getElementById('reg-success');
+=======
+  const nom = document.getElementById('r-nom').value.trim();
+  const email = document.getElementById('r-email').value.trim();
+  const pass = document.getElementById('r-pass').value;
+  const pass2 = document.getElementById('r-pass2').value;
+
+  const cguChecked = document.getElementById('chk-cgu').classList.contains('checked');
+
+  const regAlert = document.getElementById('reg-alert');
+  const regAlertText = document.getElementById('reg-alert-text');
+  const regSuccess = document.getElementById('reg-success');
+>>>>>>> publier-annonce:inscription.html
 
   regAlert.classList.add('hidden');
   regSuccess.classList.add('hidden');
 
+<<<<<<< HEAD:inscription.php
   /* ── Validations ── */
   if (!prenom || !nom || !email || !pass || !pass2) {
     regAlertText.textContent = "Remplissez tous les champs obligatoires.";
@@ -1262,6 +1291,43 @@ oninput="validatePhoneInput(this)">
 }
 </script>
 <script type="module" src="firebase.js"></script>
+=======
+  if (!prenom || !nom || !email || !pass || !pass2) {
+    regAlertText.textContent = "Veuillez remplir tous les champs obligatoires.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  if (!email.includes('@') || !email.includes('.')) {
+    regAlertText.textContent = "Veuillez saisir une adresse e-mail valide.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  if (pass.length < 8) {
+    regAlertText.textContent = "Le mot de passe doit contenir au moins 8 caractères.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  if (pass !== pass2) {
+    regAlertText.textContent = "Les mots de passe ne correspondent pas.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  if (!cguChecked) {
+    regAlertText.textContent = "Vous devez accepter les conditions générales d'utilisation.";
+    regAlert.classList.remove('hidden');
+    return false;
+  }
+
+  regSuccess.classList.remove('hidden');
+  document.getElementById('reg-btn').disabled = true;
+  return true;
+}
+  </script>
+>>>>>>> publier-annonce:inscription.html
 
 </body>
 </html>
