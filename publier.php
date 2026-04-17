@@ -385,7 +385,7 @@
   <a class="logo" href="index.php">
     <img src="images/logo.png" alt="AUTOMARKET" style="height:32px;width:auto;">
   </a>
-  <a class="nav-back" href="index.php">
+  <a class="nav-back" href="mesannonces.php">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
     Retour aux annonces
   </a>
