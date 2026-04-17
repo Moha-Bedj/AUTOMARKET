@@ -731,7 +731,7 @@ if ($action === 'login') {
   <div style="display:flex;align-items:center;padding:0 10px;border:1px solid #ccc;border-radius:6px;background:#eee;">
     +213
   </div>
-<input type="tel" id="r-tel" placeholder="5XXXXXXXX" maxlength="9"
+<input type="tel" id="l-tel" placeholder="5XXXXXXXX" maxlength="9"
 oninput="validatePhoneInput(this)">
 </div>
 
