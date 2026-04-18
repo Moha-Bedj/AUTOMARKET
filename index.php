@@ -11,10 +11,12 @@ $r = mysqli_query($conn, "
     AND a.statutAnnonce = 'active' 
     GROUP BY v.typeVehicule
 ");
-while ($row = mysqli_fetch_assoc($r)) {
-    $type = strtolower($row['typeVehicule']);
-    if (isset($counts_type[$type])) {
-        $counts_type[$type] = $row['nb'];
+if ($r) {
+    while ($row = mysqli_fetch_assoc($r)) {
+        $type = strtolower($row['typeVehicule']);
+        if (isset($counts_type[$type])) {
+            $counts_type[$type] = $row['nb'];
+        }
     }
 }
 ?>
@@ -63,9 +65,7 @@ while ($row = mysqli_fetch_assoc($r)) {
       min-height: 100vh;
     }
 
-    /* ═══════════════════════════════════════════
-       NAVBAR
-    ═══════════════════════════════════════════ */
+    /* NAVBAR */
     .nav {
       background: var(--bg0);
       border-bottom: 0.5px solid var(--bd);
@@ -89,13 +89,6 @@ while ($row = mysqli_fetch_assoc($r)) {
       white-space: nowrap;
       cursor: pointer;
       text-decoration: none;
-    }
-    .logo-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--blue);
-      flex-shrink: 0;
     }
     .nav-search {
       flex: 1;
@@ -134,8 +127,6 @@ while ($row = mysqli_fetch_assoc($r)) {
       align-items: center;
       margin-left: auto;
     }
-    
-
     .nav-btn {
       font-size: 13px;
       padding: 6px 14px;
@@ -144,19 +135,12 @@ while ($row = mysqli_fetch_assoc($r)) {
       font-family: inherit;
       transition: all .15s;
     }
-    .btn-outline {
-      background: transparent;
-      color: var(--blue);
-      border: 0.5px solid var(--blue);
-    }
-    .btn-outline:hover { background: var(--blue-bg); }
     .btn-fill {
       background: var(--blue);
       color: #fff;
       border: none;
     }
     .btn-fill:hover { background: var(--blue-dk); }
-
     .nav-fav {
       position: relative;
       cursor: pointer;
@@ -166,27 +150,11 @@ while ($row = mysqli_fetch_assoc($r)) {
       align-items: center;
       border-radius: var(--r6);
       transition: color .15s;
+      text-decoration: none;
     }
     .nav-fav:hover { color: var(--blue); }
-    .nav-badge {
-      position: absolute;
-      top: 2px; right: 2px;
-      width: 14px; height: 14px;
-      border-radius: 50%;
-      background: var(--red);
-      color: #fff;
-      font-size: 9px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 500;
-    }
 
-    /* ═══════════════════════════════════════════
-       HERO + SEARCH BOX
-    ═══════════════════════════════════════════ */
-
-    /* ══ HERO bleu — couleurs originales ══ */
+    /* HERO */
     .hero {
       background: var(--blue);
       padding: 28px 0 0;
@@ -205,7 +173,6 @@ while ($row = mysqli_fetch_assoc($r)) {
       margin-bottom: 20px;
     }
 
-    /* ── Search container : sidebar icônes + panneau blanc ── */
     .search-wrap {
       display: flex;
       max-width: 1100px;
@@ -213,7 +180,6 @@ while ($row = mysqli_fetch_assoc($r)) {
       align-items: stretch;
     }
 
-    /* Sidebar icônes — fond bleu foncé */
     .vtype-sidebar {
       width: 68px;
       background: var(--blue-dk);
@@ -272,7 +238,6 @@ while ($row = mysqli_fetch_assoc($r)) {
       animation: vtypePop 0.35s ease forwards;
     }
 
-    /* Panneau de recherche blanc */
     .search-box {
       flex: 1;
       background: #fff;
@@ -280,7 +245,6 @@ while ($row = mysqli_fetch_assoc($r)) {
       padding: 16px 20px 14px;
     }
 
-    /* Onglets */
     .search-tabs {
       display: flex;
       gap: 0;
@@ -304,7 +268,6 @@ while ($row = mysqli_fetch_assoc($r)) {
     }
     .search-tab:hover { color: var(--t1); }
 
-    /* Grille de champs */
     .sf-grid { display: grid; gap: 10px; margin-bottom: 10px; }
     .sf-grid-row1 { grid-template-columns: 1fr 1fr 1fr 1fr; }
     .sf-grid-row2 { grid-template-columns: auto 1fr 1fr auto; align-items: end; }
@@ -330,7 +293,7 @@ while ($row = mysqli_fetch_assoc($r)) {
       -webkit-appearance: none;
       font-family: inherit;
       cursor: pointer;
-      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 9px center;
       transition: border-color .15s;
@@ -339,10 +302,8 @@ while ($row = mysqli_fetch_assoc($r)) {
       border-color: var(--blue);
       box-shadow: 0 0 0 3px rgba(24,95,165,.1);
     }
-    .sf-select option { background: #fff; color: var(--t1); }
     .sf-input { padding: 0 32px 0 10px; background-image: none; }
 
-    /* Toggle Acheter / Crédit */
     .sf-toggle {
       display: flex;
       height: 40px;
@@ -370,14 +331,12 @@ while ($row = mysqli_fetch_assoc($r)) {
     }
     .sf-toggle-sep { width: 0.5px; background: var(--bd); }
 
-    /* Localisation */
     .sf-loc-wrap { position: relative; }
     .sf-loc-icon {
       position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
       color: var(--t3); pointer-events: none;
     }
 
-    /* Checkbox électrique */
     .sf-elec-row {
       display: flex;
       align-items: center;
@@ -410,7 +369,6 @@ while ($row = mysqli_fetch_assoc($r)) {
       display: flex; align-items: center; justify-content: center;
     }
 
-    /* Bouton recherche bleu */
     .btn-search {
       height: 40px;
       background: var(--blue);
@@ -431,9 +389,7 @@ while ($row = mysqli_fetch_assoc($r)) {
       justify-content: center;
     }
     .btn-search:hover { background: var(--blue-dk); }
-    .btn-search:active { transform: scale(0.99); }
 
-    /* Footer row */
     .sf-footer-row {
       display: flex;
       align-items: center;
@@ -448,93 +404,160 @@ while ($row = mysqli_fetch_assoc($r)) {
       transition: color .15s;
     }
     .sf-footer-link:hover { color: var(--blue); }
-    .price-input { width: 120px; }
-    .km-input    { width: 110px; }
-    .price-input:focus, .km-input:focus { border-color: var(--blue); }
-    .price-sep { font-size: 12px; color: var(--t3); }
 
-    .link-more {
-      font-size: 13px;
-      color: var(--blue);
-      cursor: pointer;
-      white-space: nowrap;
-      margin-left: auto;
-      text-decoration: none;
-    }
-    .link-more:hover { text-decoration: underline; }
-
-    /* ═══════════════════════════════════════════
-       QUICK FILTER PILLS
-    ═══════════════════════════════════════════ */
-    .qf-bar {
-      background: var(--bg0);
-      border-bottom: 0.5px solid var(--bd);
-      padding: 10px 20px;
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .qf-bar::-webkit-scrollbar { display: none; }
-
-    .qf-pill {
-      height: 30px;
-      padding: 0 12px;
-      border-radius: 20px;
-      border: 0.5px solid var(--bd2);
-      background: var(--bg0);
-      font-size: 12px;
-      color: var(--t2);
-      cursor: pointer;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      transition: all .15s;
-      font-family: inherit;
-    }
-    .qf-pill:hover {
-      border-color: var(--blue);
-      color: var(--blue);
-      background: var(--blue-bg);
-    }
-    .qf-pill.active {
-      border-color: var(--blue);
-      color: var(--blue);
-      background: var(--blue-bg);
-      font-weight: 500;
-    }
-    .qf-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
-
-    /* ═══════════════════════════════════════════
-       BODY LAYOUT
-    ═══════════════════════════════════════════ */
+    /* BODY — sidebar en overlay, plus en grid */
     .body-wrap {
       max-width: 1100px;
       margin: 0 auto;
       padding: 20px 16px 48px;
-      display: grid;
-      grid-template-columns: 224px 1fr;
-      gap: 20px;
     }
 
-    /* ═══════════════════════════════════════════
-       SIDEBAR
-    ═══════════════════════════════════════════ */
+    /* ═══ SIDEBAR SLIDE-IN ═══ */
     .sidebar {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 300px;
+      height: 100vh;
+      background: var(--bg1);
+      padding: 0;
+      overflow: hidden;
+      z-index: 300;
+      transform: translateX(-100%);
+      transition: transform .35s cubic-bezier(0.4, 0, 0.2, 1);
     }
+    .sidebar.open {
+      transform: translateX(0);
+      box-shadow: 4px 0 20px rgba(0,0,0,0.12);
+    }
+
+    .sidebar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--bg0);
+      border-bottom: 0.5px solid var(--bd);
+      flex-shrink: 0;
+    }
+    .sidebar-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--t1);
+    }
+    .sidebar-close {
+      width: 32px;
+      height: 32px;
+      border: 0.5px solid var(--bd);
+      background: var(--bg0);
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--t2);
+      transition: all .2s;
+    }
+    .sidebar-close:hover {
+      background: var(--red-bg);
+      color: var(--red);
+      border-color: var(--red);
+      transform: rotate(90deg);
+    }
+
+    .sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--bd2) transparent;
+    }
+    .sidebar-scroll > * { flex-shrink: 0; }
+    .sidebar-scroll::-webkit-scrollbar { width: 6px; }
+    .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-scroll::-webkit-scrollbar-thumb {
+      background: var(--bd2);
+      border-radius: 10px;
+    }
+    .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+
+    .sidebar-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0);
+      z-index: 250;
+      pointer-events: none;
+      transition: background .35s ease;
+    }
+    .sidebar-overlay.show {
+      background: rgba(0,0,0,0.4);
+      pointer-events: auto;
+    }
+
+    .btn-filter-toggle {
+      position: fixed;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 44px;
+      height: 88px;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: 0 22px 22px 0;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      font-family: inherit;
+      box-shadow: 2px 2px 12px rgba(0,0,0,0.15);
+      z-index: 150;
+      transition: all .25s;
+    }
+    .btn-filter-toggle:hover {
+      background: var(--blue-dk);
+      width: 52px;
+    }
+    .btn-filter-toggle.hidden-btn {
+      transform: translateY(-50%) translateX(-100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Cascade animation */
+    .sidebar.open .filter-card,
+    .sidebar.open .sidebar-reset,
+    .sidebar.open .ad-card {
+      animation: slideInFilter .4s ease backwards;
+    }
+    .sidebar.open .filter-card:nth-of-type(1)  { animation-delay: 0.05s; }
+    .sidebar.open .filter-card:nth-of-type(2)  { animation-delay: 0.10s; }
+    .sidebar.open .filter-card:nth-of-type(3)  { animation-delay: 0.15s; }
+    .sidebar.open .filter-card:nth-of-type(4)  { animation-delay: 0.20s; }
+    .sidebar.open .filter-card:nth-of-type(5)  { animation-delay: 0.25s; }
+    .sidebar.open .sidebar-reset               { animation-delay: 0.30s; }
+    .sidebar.open .ad-card                     { animation-delay: 0.35s; }
+
+    @keyframes slideInFilter {
+      from { opacity: 0; transform: translateX(-20px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
     .filter-card {
       background: var(--bg0);
       border: 0.5px solid var(--bd);
       border-radius: var(--r10);
       overflow: hidden;
+      width: 100%;
     }
     .filter-head {
       padding: 11px 14px;
@@ -545,6 +568,7 @@ while ($row = mysqli_fetch_assoc($r)) {
       align-items: center;
       cursor: pointer;
       user-select: none;
+      background: var(--bg0);
       transition: background .15s;
     }
     .filter-head:hover { background: var(--bg1); }
@@ -555,8 +579,10 @@ while ($row = mysqli_fetch_assoc($r)) {
     }
     .filter-arrow.open { transform: rotate(180deg); }
     .filter-body {
-      padding: 2px 14px 12px;
+      display: block;
+      padding: 8px 14px 12px;
       border-top: 0.5px solid var(--bd);
+      background: var(--bg0);
     }
     .filter-option {
       display: flex;
@@ -581,10 +607,7 @@ while ($row = mysqli_fetch_assoc($r)) {
       background: var(--bg0);
       transition: all .15s;
     }
-    .fchk.on {
-      background: var(--blue);
-      border-color: var(--blue);
-    }
+    .fchk.on { background: var(--blue); border-color: var(--blue); }
     .fchk.on::after {
       content: '';
       width: 3px;
@@ -600,8 +623,11 @@ while ($row = mysqli_fetch_assoc($r)) {
       font-size: 11px;
       color: var(--t3);
     }
-    .hero-search{display: none;}
+
+    .hero-search { display: none; }
+
     .range-row {
+      display: flex;
       gap: 6px;
       align-items: center;
       padding-top: 8px;
@@ -620,16 +646,18 @@ while ($row = mysqli_fetch_assoc($r)) {
       transition: border-color .15s;
     }
     .range-in:focus { border-color: var(--blue); }
-    .range-sep { font-size: 11px; color: var(--t3); }
 
     .sidebar-reset {
       font-size: 12px;
       color: var(--blue);
       cursor: pointer;
       text-align: center;
-      padding: 6px;
+      padding: 8px;
+      background: var(--bg0);
+      border: 0.5px solid var(--bd);
+      border-radius: var(--r8);
     }
-    .sidebar-reset:hover { text-decoration: underline; }
+    .sidebar-reset:hover { background: var(--blue-bg); }
 
     .ad-card {
       background: var(--bg0);
@@ -641,9 +669,7 @@ while ($row = mysqli_fetch_assoc($r)) {
     .ad-card-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
     .ad-card-sub   { font-size: 12px; color: var(--t2); margin-bottom: 12px; line-height: 1.5; }
 
-    /* ═══════════════════════════════════════════
-       MAIN — RESULTS
-    ═══════════════════════════════════════════ */
+    /* MAIN */
     .sell-banner {
       background: var(--blue);
       border-radius: var(--r10);
@@ -695,10 +721,9 @@ while ($row = mysqli_fetch_assoc($r)) {
       color: var(--t1);
       outline: none;
       appearance: none;
-      -webkit-appearance: none;
       font-family: inherit;
       cursor: pointer;
-      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 7px center;
     }
@@ -716,15 +741,11 @@ while ($row = mysqli_fetch_assoc($r)) {
       border: none;
       display: flex;
       align-items: center;
-      transition: all .15s;
     }
     .view-btn + .view-btn { border-left: 0.5px solid var(--bd); }
     .view-btn.active { background: var(--bg1); color: var(--t1); }
-    .view-btn:hover  { background: var(--bg1); }
 
-    /* ═══════════════════════════════════════════
-       LISTING CARDS
-    ═══════════════════════════════════════════ */
+    /* LISTINGS */
     .listings { display: flex; flex-direction: column; gap: 10px; }
 
     .lcard {
@@ -739,9 +760,6 @@ while ($row = mysqli_fetch_assoc($r)) {
     .lcard:hover {
       border-color: var(--blue);
       box-shadow: 0 0 0 2px rgba(24,95,165,.08);
-    }
-    .lcard-highlight {
-      border-left: 3px solid var(--amber);
     }
 
     .lcard-img {
@@ -766,29 +784,6 @@ while ($row = mysqli_fetch_assoc($r)) {
       justify-content: center;
       color: var(--t3);
     }
-    .img-badge {
-      position: absolute;
-      bottom: 6px; left: 6px;
-      background: rgba(0,0,0,.55);
-      color: #fff;
-      font-size: 10px;
-      padding: 2px 7px;
-      border-radius: 4px;
-    }
-    .fav-btn {
-      position: absolute;
-      top: 6px; right: 6px;
-      width: 28px; height: 28px;
-      border-radius: 50%;
-      background: rgba(255,255,255,.9);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      border: 0.5px solid rgba(0,0,0,.1);
-      transition: all .15s;
-    }
-    .fav-btn:hover { background: #fff; transform: scale(1.05); }
 
     .lcard-body {
       flex: 1;
@@ -831,23 +826,6 @@ while ($row = mysqli_fetch_assoc($r)) {
       background: var(--t3);
       flex-shrink: 0;
     }
-    .lcard-tags {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 10px;
-      flex-wrap: wrap;
-    }
-    .ltag {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 20px;
-      border: 0.5px solid;
-    }
-    .ltag-green  { background: var(--green-bg);   color: var(--green-dk); border-color: var(--green-bd); }
-    .ltag-blue   { background: var(--blue-bg);    color: var(--blue-dk);  border-color: var(--blue-bd); }
-    .ltag-amber  { background: var(--amber-bg);   color: #633806;         border-color: var(--amber-bd); }
-    .ltag-gray   { background: var(--bg1);        color: var(--t2);       border-color: var(--bd2); }
-
     .lcard-foot {
       display: flex;
       align-items: center;
@@ -873,73 +851,7 @@ while ($row = mysqli_fetch_assoc($r)) {
     }
     .ldate { font-size: 11px; color: var(--t3); }
 
-    /* ═══════════════════════════════════════════
-       PAGINATION
-    ═══════════════════════════════════════════ */
-    .pagination {
-      display: flex;
-      justify-content: center;
-      gap: 4px;
-      margin-top: 20px;
-    }
-    .pg-btn {
-      width: 32px; height: 32px;
-      border-radius: var(--r6);
-      border: 0.5px solid var(--bd2);
-      background: var(--bg0);
-      color: var(--t2);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 13px;
-      font-family: inherit;
-      transition: all .15s;
-    }
-    .pg-btn:hover     { border-color: var(--blue); color: var(--blue); }
-    .pg-btn.active    { background: var(--blue); color: #fff; border-color: var(--blue); }
-    .pg-btn-wide      { width: auto; padding: 0 10px; }
-
-    /* ═══════════════════════════════════════════
-       BRANDS SECTION
-    ═══════════════════════════════════════════ */
-    .brands-section { margin-top: 28px; }
-    .section-title  { font-size: 15px; font-weight: 500; margin-bottom: 12px; }
-
-    .brands-grid {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 8px;
-    }
-    .brand-card {
-      background: var(--bg0);
-      border: 0.5px solid var(--bd);
-      border-radius: var(--r8);
-      padding: 12px 8px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-      transition: border-color .15s;
-    }
-    .brand-card:hover { border-color: var(--blue); }
-    .brand-logo {
-      width: 38px; height: 38px;
-      border-radius: 50%;
-      background: var(--bg1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--t2);
-    }
-    .brand-name { font-size: 11px; color: var(--t2); }
-
-    /* ═══════════════════════════════════════════
-       FOOTER
-    ═══════════════════════════════════════════ */
+    /* FOOTER */
     .footer {
       background: var(--bg0);
       border-top: 0.5px solid var(--bd);
@@ -951,282 +863,236 @@ while ($row = mysqli_fetch_assoc($r)) {
     }
     .footer a { color: var(--blue); text-decoration: none; }
     .footer a:hover { text-decoration: underline; }
+
+    /* USER MENU */
     .user-menu {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px 4px 4px;
-  border-radius: 20px;
-  cursor: pointer;
-  transition: background .15s;
-}
-.user-menu:hover { background: var(--bg1); }
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 0.5px solid var(--bd);
-}
-
-.user-avatar-initial {
-  background: var(--blue);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 500;
-  border: none;
-}
-
-.user-name {
-  font-size: 13px;
-  font-weight: 500;
-}
-.dropdown {
-  position: absolute;
-  right: 20px;
-  top: 48px;
-  background: #fff;
-  border: 0.5px solid var(--bd);
-  border-radius: 8px;
-  padding: 6px 0;
-  min-width: 160px;
-  z-index: 200;
-}
-.dropdown-item {
-  display: block;
-  padding: 8px 14px;
-  font-size: 13px;
-  color: var(--t1);
-  text-decoration: none;
-  transition: background .15s;
-}
-.dropdown-item:hover {
-  background: var(--bg1);
-}
-
-  @media (max-width: 600px) {
-    #logo-id{
-      display: none;
-    }
-
-    /* Cache la navbar search et les liens */
-    .nav-search { display: none; }
-    .nav-fav { display: none; }
-    .nav { padding: 0 16px; justify-content: space-between; }
-
-    /* Hero — fond blanc comme mobile.de */
-    .hero { background: #fff; padding: 20px 16px 0; text-align: left; }
-    .hero-title { color: #1a1a18; font-size: 24px; font-weight: 500; margin-bottom: 16px; }
-    .hero-sub { display: none; }
-
-    /* Grande barre de recherche */
-    .search-wrap { 
-      flex-direction: column; max-width: 100%; 
-      border: 0.5px solid var(--blue-dk); border-radius: var(--r10);
-      
-      }
-    .search-box { border-radius: 8px; padding: 0; background: transparent; }
-    .search-tabs { display: none; }
-    .sf-grid-row2 > div:last-child { display: none; } /* cache le bouton */
-
-    /* Barre de recherche principale */
-    .nav-search {
-      display: none;
-      
-    }
-      .hero-search {
       display: flex;
-      width: 100%;
-      max-width: 100%;
-      margin-bottom: 14px;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px 4px 4px;
+      border-radius: 20px;
+      cursor: pointer;
       position: relative;
+      transition: background .15s;
     }
-    .hero-search input {
-      width: 100%;
-      height: 48px;
-      border: 1.5px solid rgba(0,0,0,.2);
-      border-radius: 10px;
-      padding: 0 12px 0 40px;
-      font-size: 15px;
-      outline: none;
-      font-family: inherit;
+    .user-menu:hover { background: var(--bg1); }
+    .user-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 0.5px solid var(--bd);
     }
-    .hero-search svg {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #888;
-      pointer-events: none;
-    }
-    /* Icônes véhicules en ligne style mobile.de */
-    .vtype-sidebar {
-      flex-direction: row;
-      width: 100%;
-      border-radius: 0;
-      padding: 8px 0 0;
-      background: var(--blue-dk);
-      border-radius: var(--r10) var(--r10) 0 0;
-      border-top: 0.5px solid rgba(0,0,0,.1);
-      gap: 0;
-    }
-    .vtype-icon-btn {
-      flex: 1;
-      height: 56px;
-      border-radius: 0;
-      background: transparent;
-      color: rgba(255,255,255,.5);
-      border-bottom: 2.5px solid transparent;
-      flex-direction: column;
-      gap: 3px;
-    }
-    .vtype-icon-btn.active {
+    .user-avatar-initial {
+      background: var(--blue);
       color: #fff;
-      background: rgba(255,255,255,.15);
-      border-bottom-color: #185FA5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 500;
+      border: none;
     }
-    .vtype-icon-btn.active::before { display: none; }
-    .vtype-label { font-size: 10px; }
-    .vtype-svg { width: 22px; height: 22px; }
-
-    /* Filtres */
-    .search-box { padding: 14px 16px; }
-    .sf-grid-row1 { grid-template-columns: 1fr 1fr; }
-    .sf-grid-row2 { grid-template-columns: 1fr 1fr; }
-    .sf-elec-row { margin-bottom: 10px; }
-
-    /* Bouton recherche pleine largeur */
-    .btn-search {
-      width: 100%;
-      height: 48px;
-      font-size: 15px;
-      border-radius: 10px;
-      margin-top: 6px;
+    .user-name {
+      font-size: 13px;
+      font-weight: 500;
     }
-    .sf-grid-row2 { grid-template-columns: 1fr 1fr; }
-    #col-paiement { display: none; }
-
-    /* Layout body */
-    .body-wrap {
-      grid-template-columns: 1fr;
-      padding: 10px 10px 32px;
+    .dropdown {
+      position: absolute;
+      right: 20px;
+      top: 48px;
+      background: #fff;
+      border: 0.5px solid var(--bd);
+      border-radius: 8px;
+      padding: 6px 0;
+      min-width: 160px;
+      z-index: 200;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
     }
-    .sidebar { display: none; }
-    .qf-bar { display: none; }
+    .dropdown-item {
+      display: block;
+      padding: 8px 14px;
+      font-size: 13px;
+      color: var(--t1);
+      text-decoration: none;
+      transition: background .15s;
+    }
+    .dropdown-item:hover { background: var(--bg1); }
 
-    /* Cards */
-    .lcard { flex-direction: column; }
-    .lcard-img { width: 100%; height: 190px; }
-    .sell-banner { flex-direction: column; text-align: center; }
-    .results-head { flex-direction: column; gap: 8px; }
-  }
+    /* RESPONSIVE */
+    @media (max-width: 600px) {
+      #logo-id { display: none; }
+      .nav-search { display: none; }
+      .nav-fav { display: none; }
+      .nav { padding: 0 16px; justify-content: space-between; }
+
+      .hero { background: #fff; padding: 20px 16px 0; text-align: left; }
+      .hero-title { color: #1a1a18; font-size: 24px; font-weight: 500; margin-bottom: 16px; }
+      .hero-sub { display: none; }
+
+      .search-wrap {
+        flex-direction: column; max-width: 100%;
+        border: 0.5px solid var(--blue-dk); border-radius: var(--r10);
+      }
+      .search-box { border-radius: 8px; padding: 0; background: transparent; }
+      .search-tabs { display: none; }
+      .sf-grid-row2 > div:last-child { display: none; }
+
+      .hero-search {
+        display: flex;
+        width: 100%;
+        max-width: 100%;
+        margin-bottom: 14px;
+        position: relative;
+      }
+      .hero-search input {
+        width: 100%;
+        height: 48px;
+        border: 1.5px solid rgba(0,0,0,.2);
+        border-radius: 10px;
+        padding: 0 12px 0 40px;
+        font-size: 15px;
+        outline: none;
+        font-family: inherit;
+      }
+      .hero-search svg {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #888;
+        pointer-events: none;
+      }
+
+      .vtype-sidebar {
+        flex-direction: row;
+        width: 100%;
+        border-radius: 0;
+        padding: 8px 0 0;
+        background: var(--blue-dk);
+        border-radius: var(--r10) var(--r10) 0 0;
+        gap: 0;
+      }
+      .vtype-icon-btn {
+        flex: 1;
+        height: 56px;
+        border-radius: 0;
+        background: transparent;
+        color: rgba(255,255,255,.5);
+        border-bottom: 2.5px solid transparent;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .vtype-icon-btn.active {
+        color: #fff;
+        background: rgba(255,255,255,.15);
+        border-bottom-color: #185FA5;
+      }
+      .vtype-icon-btn.active::before { display: none; }
+      .vtype-label { font-size: 10px; }
+      .vtype-svg { width: 22px; height: 22px; }
+
+      .search-box { padding: 14px 16px; }
+      .sf-grid-row1 { grid-template-columns: 1fr 1fr; }
+      .sf-grid-row2 { grid-template-columns: 1fr 1fr; }
+      .sf-elec-row { margin-bottom: 10px; }
+
+      .btn-search {
+        width: 100%;
+        height: 48px;
+        font-size: 15px;
+        border-radius: 10px;
+        margin-top: 6px;
+      }
+      #col-paiement { display: none; }
+
+      .body-wrap { padding: 10px 10px 32px; }
+
+      .lcard { flex-direction: column; }
+      .lcard-img { width: 100%; height: 190px; }
+      .sell-banner { flex-direction: column; text-align: center; }
+      .results-head { flex-direction: column; gap: 8px; }
+
+      .sidebar { width: 85%; max-width: 320px; }
+      .btn-filter-toggle { width: 40px; height: 72px; }
+    }
   </style>
 </head>
 <body>
 
-  <!-- ══════════════════════════════════════════
-       NAVBAR
-  ══════════════════════════════════════════ -->
+  <!-- NAVBAR -->
   <nav class="nav">
     <a class="logo" href="#">
-      <img src="images/logo.png" alt="AUTOMARKET" style="height:34px;width:auto;display:block;" >
+      <img src="images/logo.png" alt="AUTOMARKET" style="height:34px;width:auto;display:block;">
       <img src="images/id.png" alt="" style="height:34px;width:auto;display:block;" id="logo-id">
     </a>
 
     <div class="nav-search">
-   
-
       <svg class="nav-search-icon" width="14" height="14" viewBox="0 0 24 24"
            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
       </svg>
       <input type="text" placeholder="Marque, modèle, wilaya…">
     </div>
-    
 
     <div class="nav-links">
-       <div class="nav-fav" title="Notifications">
-    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" 
-         fill="currentColor" viewBox="0 0 24 24">
-      <path d="M19 12.59V10c0-3.22-2.18-5.93-5.14-6.74C13.57 2.52 12.85 2 12 2s-1.56.52-1.86 1.26C7.18 4.08 5 6.79 5 10v2.59L3.29 14.3a1 1 0 0 0-.29.71v2c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-2c0-.27-.11-.52-.29-.71zM19 16H5v-.59l1.71-1.71a1 1 0 0 0 .29-.71v-3c0-2.76 2.24-5 5-5s5 2.24 5 5v3c0 .27.11.52.29.71L19 15.41zm-4.18 4H9.18c.41 1.17 1.51 2 2.82 2s2.41-.83 2.82-2"/>
-    </svg>
-  </div>
-
-     <?php if (isset($_SESSION['idUtilisateur'])): ?>
-  <a class="nav-fav" href="favoris.php" title="Mes favoris">
-    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"  
-    fill="currentColor" viewBox="0 0 24 24">
-      <path d="M11.29 20.66c.2.2.45.29.71.29s.51-.1.71-.29l7.5-7.5c2.35-2.35 2.35-6.05 0-8.41-2.3-2.28-5.85-2.35-8.21-.2-2.36-2.15-5.91-2.09-8.21.2-2.35 2.36-2.35 6.06 0 8.41zM5.21 6.16C6 5.38 7 4.99 8.01 4.99s2.01.39 2.79 1.17l.5.5c.39.39 1.02.39 1.41 0l.5-.5c1.56-1.56 4.02-1.56 5.59 0 1.56 1.57 1.56 4.02 0 5.58l-6.79 6.79-6.79-6.79a3.91 3.91 0 0 1 0-5.58Z"></path>
-    </svg>
-  </a>
-<?php endif; ?>
-      
-</svg>
-        <!--<div class="nav-badge"></div>-->
+      <div class="nav-fav" title="Notifications">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M19 12.59V10c0-3.22-2.18-5.93-5.14-6.74C13.57 2.52 12.85 2 12 2s-1.56.52-1.86 1.26C7.18 4.08 5 6.79 5 10v2.59L3.29 14.3a1 1 0 0 0-.29.71v2c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-2c0-.27-.11-.52-.29-.71zM19 16H5v-.59l1.71-1.71a1 1 0 0 0 .29-.71v-3c0-2.76 2.24-5 5-5s5 2.24 5 5v3c0 .27.11.52.29.71L19 15.41zm-4.18 4H9.18c.41 1.17 1.51 2 2.82 2s2.41-.83 2.82-2"/>
+        </svg>
       </div>
 
-      
-<?php if (isset($_SESSION['idUtilisateur'])): ?>
-  <div class="user-menu">
-    
-    
       <?php if (isset($_SESSION['idUtilisateur'])): ?>
-  <div class="user-menu" onclick="toggleMenu()">
-    <?php if (!empty($_SESSION['photo'])): ?>
-  <img src="<?= htmlspecialchars($_SESSION['photo']) ?>" 
-       class="user-avatar" 
-       alt=""
-       referrerpolicy="no-referrer"
-       onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-  <div class="user-avatar user-avatar-initial" style="display:none">
-    <?= strtoupper(substr($_SESSION['prenom'] ?? 'U', 0, 1)) ?>
-  </div>
-<?php else: ?>
-  <div class="user-avatar user-avatar-initial">
-    <?= strtoupper(substr($_SESSION['prenom'] ?? 'U', 0, 1)) ?>
-  </div>
-<?php endif; ?>
-    <span class="user-name"><?= htmlspecialchars($_SESSION['prenom']) ?></span>
-  </div>
+        <a class="nav-fav" href="favoris.php" title="Mes favoris">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M11.29 20.66c.2.2.45.29.71.29s.51-.1.71-.29l7.5-7.5c2.35-2.35 2.35-6.05 0-8.41-2.3-2.28-5.85-2.35-8.21-.2-2.36-2.15-5.91-2.09-8.21.2-2.35 2.36-2.35 6.06 0 8.41zM5.21 6.16C6 5.38 7 4.99 8.01 4.99s2.01.39 2.79 1.17l.5.5c.39.39 1.02.39 1.41 0l.5-.5c1.56-1.56 4.02-1.56 5.59 0 1.56 1.57 1.56 4.02 0 5.58l-6.79 6.79-6.79-6.79a3.91 3.91 0 0 1 0-5.58Z"/>
+          </svg>
+        </a>
 
-  <!-- Menu dropdown -->
-  <div id="user-dropdown" class="dropdown" style="display:none">
-    <a href="monprofil.php" class="dropdown-item">Mon profil</a>
-    <a href="mesannonces.php" class="dropdown-item">Mes annonces</a>
-    <a href="favoris.php" class="dropdown-item">Mes favoris</a>
-    <hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
-    <a href="deconnexion.php" class="dropdown-item" style="color:var(--red)">Se déconnecter</a>
-  </div>
-<?php endif; ?>
-<?php else: ?>
-  <button class="nav-btn btn-fill" onclick="location.href='inscription.php'">Connexion</button>
-<?php endif; ?>    </div>
+        <div class="user-menu" onclick="toggleMenu()">
+          <?php if (!empty($_SESSION['photo'])): ?>
+            <img src="<?= htmlspecialchars($_SESSION['photo']) ?>"
+                 class="user-avatar" alt=""
+                 referrerpolicy="no-referrer"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <div class="user-avatar user-avatar-initial" style="display:none">
+              <?= strtoupper(substr($_SESSION['prenom'] ?? 'U', 0, 1)) ?>
+            </div>
+          <?php else: ?>
+            <div class="user-avatar user-avatar-initial">
+              <?= strtoupper(substr($_SESSION['prenom'] ?? 'U', 0, 1)) ?>
+            </div>
+          <?php endif; ?>
+          <span class="user-name"><?= htmlspecialchars($_SESSION['prenom']) ?></span>
+        </div>
+
+        <div id="user-dropdown" class="dropdown" style="display:none">
+          <a href="monprofil.php" class="dropdown-item">Mon profil</a>
+          <a href="mesannonces.php" class="dropdown-item">Mes annonces</a>
+          <a href="favoris.php" class="dropdown-item">Mes favoris</a>
+          <hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
+          <a href="deconnexion.php" class="dropdown-item" style="color:var(--red)">Se déconnecter</a>
+        </div>
+      <?php else: ?>
+        <button class="nav-btn btn-fill" onclick="location.href='inscription.php'">Connexion</button>
+      <?php endif; ?>
+    </div>
   </nav>
 
-  <!-- ══════════════════════════════════════════
-       HERO + SEARCH BOX style mobile.de
-  ══════════════════════════════════════════ -->
+  <!-- HERO + SEARCH -->
   <section class="hero">
     <h1 class="hero-title">Trouvez votre prochain véhicule en Algérie</h1>
     <p class="hero-sub" id="hero-sub">Marketplace automobile algérienne</p>
 
-  <!-- Barre de recherche principale -->
-  <div class="hero-search">
-    <svg class="nav-search-icon" width="16" height="16" viewBox="0 0 24 24"
-        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-    </svg>
-    <input type="text" placeholder="Marque, modèle, wilaya…">
-  </div>
+    <div class="hero-search">
+      <svg class="nav-search-icon" width="16" height="16" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input type="text" placeholder="Marque, modèle, wilaya…">
+    </div>
 
-  
     <div class="search-wrap">
-
-      <!-- Sidebar icônes type véhicule -->
       <div class="vtype-sidebar">
         <button class="vtype-icon-btn active" id="vt-voiture" onclick="setVType('voiture')" title="Voiture">
           <svg class="vtype-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
@@ -1237,28 +1103,25 @@ while ($row = mysqli_fetch_assoc($r)) {
         </button>
         <button class="vtype-icon-btn" id="vt-moto" onclick="setVType('moto')" title="Moto">
           <svg class="vtype-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M20.26 14.47s-.06-.04-.1-.05c-.5-.27-1.07-.42-1.66-.42h-.06l-2.19-5.01h1.26c.28 0 .5-.22.5-.5v-1c0-.28-.22-.5-.5-.5h-2.13l-.09-.2a3.01 3.01 0 0 0-2.75-1.8h-1.53v2h1.53c.4 0 .76.24.92.6l1.05 2.4h-3.93c-.29 0-.56.12-.75.33L7.44 13l-2.72-2.72a1 1 0 0 0-.71-.29H1.84v2h1.75L5.6 14s-.06-.01-.1-.01c-1.11 0-2.13.51-2.79 1.38-.3.39-.53.87-.65 1.43-.04.22-.07.45-.07.68 0 1.93 1.57 3.5 3.5 3.5s3.5-1.57 3.5-3.5v-.1l1.3 1.3c.19.19.44.29.71.29h2c.25 0 .5-.1.68-.27L15 17.47c0 1.93 1.57 3.49 3.5 3.49s3.5-1.57 3.5-3.5c0-1.24-.67-2.4-1.74-3.03ZM5.5 19a1.498 1.498 0 0 1-1.47-1.79c.05-.23.14-.45.27-.61a1.506 1.506 0 0 1 1.94-.41l.06.03c.35.23.59.58.67.95.02.1.03.21.03.32 0 .83-.67 1.5-1.5 1.5Zm7.11-2h-1.19l-2.57-2.57L11.02 12h4.36l.76 1.73L12.62 17Zm5.89 2a1.498 1.498 0 0 1-1.2-2.4 1.506 1.506 0 0 1 1.94-.41 1.53 1.53 0 0 1 .77 1.31c0 .83-.67 1.5-1.5 1.5Z"/>
+            <path d="M20.26 14.47s-.06-.04-.1-.05c-.5-.27-1.07-.42-1.66-.42h-.06l-2.19-5.01h1.26c.28 0 .5-.22.5-.5v-1c0-.28-.22-.5-.5-.5h-2.13l-.09-.2a3.01 3.01 0 0 0-2.75-1.8h-1.53v2h1.53c.4 0 .76.24.92.6l1.05 2.4h-3.93c-.29 0-.56.12-.75.33L7.44 13l-2.72-2.72a1 1 0 0 0-.71-.29H1.84v2h1.75L5.6 14c-1.11 0-2.13.51-2.79 1.38-.3.39-.53.87-.65 1.43-.04.22-.07.45-.07.68 0 1.93 1.57 3.5 3.5 3.5s3.5-1.57 3.5-3.5v-.1l1.3 1.3c.19.19.44.29.71.29h2c.25 0 .5-.1.68-.27L15 17.47c0 1.93 1.57 3.49 3.5 3.49s3.5-1.57 3.5-3.5c0-1.24-.67-2.4-1.74-3.03Z"/>
           </svg>
           <span class="vtype-label">Moto</span>
         </button>
         <button class="vtype-icon-btn" id="vt-camion" onclick="setVType('camion')" title="Camion">
           <svg class="vtype-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19.1 7.8c-.38-.5-.97-.8-1.6-.8H15V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2 0 1.65 1.35 3 3 3s3-1.35 3-3h4c0 1.65 1.35 3 3 3s3-1.35 3-3c1.1 0 2-.9 2-2v-3.67c0-.43-.14-.86-.4-1.2zM17.5 9l1.5 2h-4V9zM7 19a1.003 1.003 0 0 1-.87-1.5c.37-.63 1.36-.63 1.73 0 .09.15.13.32.13.49 0 .55-.45 1-1 1Zm2.23-3s-.05-.05-.08-.07c-.06-.06-.12-.11-.17-.16-.12-.11-.25-.21-.38-.29a3 3 0 0 0-.67-.32c-.07-.02-.14-.05-.21-.07Q7.375 15 7 15c-.375 0-.49.04-.72.09-.07.02-.14.05-.21.07-.16.05-.31.11-.45.19-.07.04-.15.08-.22.13-.13.09-.26.18-.38.29-.06.05-.12.1-.18.16-.02.03-.05.04-.08.07h-.77V6h9v10H9.22ZM17 19a1.003 1.003 0 0 1-.87-1.5c.37-.63 1.36-.63 1.73 0 .09.15.13.32.13.49 0 .55-.45 1-1 1Zm3-3h-.77s-.05-.05-.08-.07c-.06-.06-.12-.11-.17-.16-.12-.11-.25-.21-.38-.29a3 3 0 0 0-.67-.32c-.07-.02-.14-.05-.21-.07Q17.375 15 17 15c-.375 0-.47.04-.7.09-.06.01-.12.03-.18.05-.18.06-.36.13-.52.22l-.12.06c-.17.1-.33.21-.48.35v-2.76h5v3Z"/>
+            <path d="M19.1 7.8c-.38-.5-.97-.8-1.6-.8H15V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2 0 1.65 1.35 3 3 3s3-1.35 3-3h4c0 1.65 1.35 3 3 3s3-1.35 3-3c1.1 0 2-.9 2-2v-3.67c0-.43-.14-.86-.4-1.2zM17.5 9l1.5 2h-4V9z"/>
           </svg>
           <span class="vtype-label">Camion</span>
         </button>
       </div>
 
-      <!-- Panneau de recherche blanc -->
       <div class="search-box">
-
         <div class="search-tabs">
-          <div class="search-tab active" id="st-buy"  onclick="setSTab('buy')">Acheter</div>
-          <div class="search-tab"        id="st-rent" onclick="setSTab('rent')">Louer</div>
+          <div class="search-tab active" id="st-buy" onclick="setSTab('buy')">Acheter</div>
+          <div class="search-tab" id="st-rent" onclick="setSTab('rent')">Louer</div>
         </div>
 
-        <!-- Champs row 1 : Marque / Modèle / Année depuis / Km jusqu'à -->
-        <div class="sf-grid sf-grid-row1" id="sf-row1">
+        <div class="sf-grid sf-grid-row1">
           <div>
             <div class="sf-label" id="lbl-marque">Marque</div>
             <select class="sf-select" id="sel-marque" onchange="updateModels()">
@@ -1284,16 +1147,11 @@ while ($row = mysqli_fetch_assoc($r)) {
             <div class="sf-label" id="lbl-km">Kilomètres jusqu'à</div>
             <select class="sf-select" id="sel-km">
               <option value="">Quelconque</option>
-              <option>10 000 km</option><option>30 000 km</option>
-              <option>50 000 km</option><option>80 000 km</option>
-              <option>100 000 km</option><option>150 000 km</option>
-              <option>200 000 km</option>
             </select>
           </div>
         </div>
 
-        <!-- Champs row 2 : Mode paiement / Prix / Lieu / Bouton -->
-        <div class="sf-grid sf-grid-row2" id="sf-row2">
+        <div class="sf-grid sf-grid-row2">
           <div id="col-paiement">
             <div class="sf-label">Mode</div>
             <div class="sf-toggle">
@@ -1318,54 +1176,22 @@ while ($row = mysqli_fetch_assoc($r)) {
               <input class="sf-input" type="text" placeholder="Quelconque" id="inp-wilaya" list="wilayas-list">
               <svg class="sf-loc-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
               <datalist id="wilayas-list">
-                <option value="01">Adrar</option>v>
-              <option value="02">Aïn Defla</option>
-              <option value="03">Aïn Témouchent</option>
-              <option value="04">Alger</option>
-              <option value="05">Annaba</option>
-              <option value="06">Batna</option>
-              <option value="07">Béchar</option>
-              <option value="08">Béjaïa</option>
-              <option value="09">Biskra</option>
-              <option value="10">Blida</option>
-              <option value="11">Bordj Bou Arreridj</option>
-              <option value="12">Bouira</option>
-              <option value="13">Boumerdès</option>
-              <option value="14">Chlef</option>
-              <option value="15">Constantine</option>
-              <option value="16">Djelfa</option>
-              <option value="17">Djanet</option>
-              <option value="18">El Bayadh</option>
-              <option value="19">El Oued</option>
-              <option value="20">El Tarf</option>
-              <option value="21">Essenia</option>
-              <option value="22">Guelma</option>
-              <option value="23">Ghardaïa</option>
-              <option value="24">Gouraya</option>
-              <option value="25">Illizi</option>
-              <option value="26">Jijel</option>
-              <option value="27">Khenchela</option>
-              <option value="28">Laghouat</option>
-              <option value="29">Mila</option>
-              <option value="30">Mascara</option>
-              <option value="31">Médéa</option>
-              <option value="32">Mila</option>
-              <option value="33">Mostaganem</option>
-              <option value="34">M'Sila</option>
-              <option value="35">Naâma</option>
-              <option value="36">Oran</option>
-              <option value="37">Ouargla</option>
-              <option value="38">Oum El Bouaghi</option>
-              <option value="39">Relizane</option>
-              <option value="40">Saïda</option>
-              <option value="41">Sétif</option>
-              <option value="42">Sidi Bel Abbès</option>
-              <option value="43">Skikda</option>
-              <option value="44">Souk Ahras</option>
-              <option value="45">Tamanrasset</option>
-              <option value="46">Tébessa</option>
-              <option value="47">Tiaret</option>
-              <option value="48">Tindouf</option>
+                <option value="Adrar"><option value="Aïn Defla"><option value="Aïn Témouchent">
+                <option value="Alger"><option value="Annaba"><option value="Batna">
+                <option value="Béchar"><option value="Béjaïa"><option value="Biskra">
+                <option value="Blida"><option value="Bordj Bou Arreridj"><option value="Bouira">
+                <option value="Boumerdès"><option value="Chlef"><option value="Constantine">
+                <option value="Djelfa"><option value="El Bayadh"><option value="El Oued">
+                <option value="El Tarf"><option value="Ghardaïa"><option value="Guelma">
+                <option value="Illizi"><option value="Jijel"><option value="Khenchela">
+                <option value="Laghouat"><option value="Mascara"><option value="Médéa">
+                <option value="Mila"><option value="Mostaganem"><option value="M'Sila">
+                <option value="Naâma"><option value="Oran"><option value="Ouargla">
+                <option value="Oum El Bouaghi"><option value="Relizane"><option value="Saïda">
+                <option value="Sétif"><option value="Sidi Bel Abbès"><option value="Skikda">
+                <option value="Souk Ahras"><option value="Tamanrasset"><option value="Tébessa">
+                <option value="Tiaret"><option value="Tindouf"><option value="Tipaza">
+                <option value="Tissemsilt"><option value="Tizi Ouzou"><option value="Tlemcen">
               </datalist>
             </div>
           </div>
@@ -1379,7 +1205,6 @@ while ($row = mysqli_fetch_assoc($r)) {
           </div>
         </div>
 
-        <!-- Footer row -->
         <div class="sf-footer-row">
           <div class="sf-elec-row" id="sf-elec-row">
             <div class="sf-chk" id="chk-elec" onclick="toggleElec()"></div>
@@ -1393,122 +1218,95 @@ while ($row = mysqli_fetch_assoc($r)) {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
             Réinitialiser
           </span>
-          <span class="sf-footer-link">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
-            Filtres avancés
-          </span>
         </div>
-
-      </div><!-- end search-box -->
-    </div><!-- end search-wrap -->
+      </div>
+    </div>
   </section>
 
-  
+  <!-- BOUTON FLOTTANT SIDEBAR -->
+  <button class="btn-filter-toggle" id="btn-filter-toggle" onclick="openSidebar()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <line x1="4" y1="6" x2="20" y2="6"/>
+      <line x1="8" y1="12" x2="16" y2="12"/>
+      <line x1="10" y1="18" x2="14" y2="18"/>
+    </svg>
+    <span>Filtres</span>
+  </button>
 
-  <!-- ══════════════════════════════════════════
-       BODY : SIDEBAR + MAIN
-  ══════════════════════════════════════════ -->
-  <div class="body-wrap">
+  <!-- Overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
 
-    <!-- ── SIDEBAR ── -->
-    <aside class="sidebar">
+  <!-- SIDEBAR SLIDE-IN -->
+  <aside class="sidebar" id="sidebar">
 
-      <!-- Filtre Carburant —  -->
+    <div class="sidebar-header">
+      <div class="sidebar-title">Filtres rapides</div>
+      <button class="sidebar-close" onclick="closeSidebar()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M18 6 6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="sidebar-scroll">
+
       <div class="filter-card">
         <div class="filter-head" onclick="toggleFilter(this)">
-          Carburant
-          <span class="filter-arrow open">▼</span>
+          Carburant <span class="filter-arrow open">▼</span>
         </div>
         <div class="filter-body">
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Diesel<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Essence<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>GPL<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Hybride<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Électrique<span class="fcount"></span>
-          </div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Diesel<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Essence<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>GPL<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Hybride<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Électrique<span class="fcount"></span></div>
         </div>
       </div>
 
-      <!-- Filtre Transmission -->
       <div class="filter-card">
         <div class="filter-head" onclick="toggleFilter(this)">
-          Transmission
-          <span class="filter-arrow open">▼</span>
+          Transmission <span class="filter-arrow open">▼</span>
         </div>
         <div class="filter-body">
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Manuelle<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Automatique<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Semi-automatique<span class="fcount"></span>
-          </div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Manuelle<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Automatique<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Semi-automatique<span class="fcount"></span></div>
         </div>
       </div>
 
-      <!-- Filtre Prix -->
       <div class="filter-card">
         <div class="filter-head" onclick="toggleFilter(this)">
-          Prix (DA)
-          <span class="filter-arrow open">▼</span>
+          Prix (DA) <span class="filter-arrow open">▼</span>
         </div>
         <div class="filter-body">
           <div class="range-row">
-            <input class="range-in" type="number" name="prix_min" placeholder="Min"><br><br>
-            <input class="range-in" type="number" name="prix_max" placeholder="Max">
+            <input class="range-in" type="number" placeholder="Min">
+            <span style="font-size:11px;color:var(--t3)">—</span>
+            <input class="range-in" type="number" placeholder="Max">
           </div>
         </div>
       </div>
 
-      <!-- Filtre Kilométrage -->
       <div class="filter-card">
         <div class="filter-head" onclick="toggleFilter(this)">
-          Kilométrage
-          <span class="filter-arrow open">▼</span>
+          Kilométrage <span class="filter-arrow open">▼</span>
         </div>
         <div class="filter-body">
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Moins de 30 000 km<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>30 000 – 80 000 km<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>80 000 – 150 000 km<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Plus de 150 000 km<span class="fcount"></span>
-          </div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Moins de 30 000 km<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>30 000 – 80 000 km<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>80 000 – 150 000 km<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Plus de 150 000 km<span class="fcount"></span></div>
         </div>
       </div>
 
-      <!-- Filtre État -->
       <div class="filter-card">
         <div class="filter-head" onclick="toggleFilter(this)">
-          État du véhicule
-          <span class="filter-arrow open">▼</span>
+          État du véhicule <span class="filter-arrow open">▼</span>
         </div>
         <div class="filter-body">
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Occasion<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Neuf<span class="fcount"></span>
-          </div>
-          <div class="filter-option" onclick="toggleFChk(this)">
-            <div class="fchk"></div>Accidenté / Pièces<span class="fcount"></span>
-          </div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Occasion<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Neuf<span class="fcount"></span></div>
+          <div class="filter-option" onclick="toggleFChk(this)"><div class="fchk"></div>Accidenté / Pièces<span class="fcount"></span></div>
         </div>
       </div>
 
@@ -1519,13 +1317,12 @@ while ($row = mysqli_fetch_assoc($r)) {
         <div class="ad-card-sub">Publiez une annonce gratuite en moins de 5 minutes</div>
         <button class="nav-btn btn-fill" style="width:100%" onclick="location.href='publier.php'">Publier une annonce</button>
       </div>
+    </div>
+  </aside>
 
-    </aside>
-
-    <!-- ── MAIN ── -->
+  <!-- BODY -->
+  <div class="body-wrap">
     <main>
-
-      <!-- Banner CTA vendeur -->
       <div class="sell-banner">
         <div class="sell-banner-text">
           <div class="sell-banner-title">Vous souhaitez vendre votre véhicule ?</div>
@@ -1534,7 +1331,6 @@ while ($row = mysqli_fetch_assoc($r)) {
         <button class="btn-white" onclick="location.href='publier.php'">Déposer une annonce</button>
       </div>
 
-      <!-- En-tête résultats -->
       <div class="results-head">
         <div class="results-count">
           <span id="total-count">
@@ -1548,7 +1344,7 @@ while ($row = mysqli_fetch_assoc($r)) {
         </div>
         <div class="sort-row">
           <span class="sort-label">Trier :</span>
-          <select class="sort-sel" name="tri" onchange="this.form && this.form.submit()">
+          <select class="sort-sel">
             <option value="date_desc">Les plus récentes</option>
             <option value="prix_asc">Prix croissant</option>
             <option value="prix_desc">Prix décroissant</option>
@@ -1573,12 +1369,11 @@ while ($row = mysqli_fetch_assoc($r)) {
         </div>
       </div>
 
-      <!-- Zone d'annonces — sera remplie par PHP/AJAX -->
       <div class="listings" id="listings-container">
-      <?php
+        <?php
         $sql_annonces = "
-            SELECT 
-                a.idAnnonce, a.titre, a.prix, a.localisation, 
+            SELECT
+                a.idAnnonce, a.titre, a.prix, a.localisation,
                 a.datePublication, a.vendeurVerif,
                 v.annee, v.kilometrage, v.carburant, v.transmission,
                 u.nom AS vendeur_nom, u.prenom AS vendeur_prenom
@@ -1594,10 +1389,6 @@ while ($row = mysqli_fetch_assoc($r)) {
         if (!$res_annonces || mysqli_num_rows($res_annonces) == 0) {
             echo '<div style="padding:40px;text-align:center;color:#888">Aucune annonce.</div>';
         } else {
-            /* Mettre à jour le compteur */
-            $total = mysqli_num_rows($res_annonces);
-            echo "<script>document.getElementById('total-count').textContent = '$total';</script>";
-
             while ($a = mysqli_fetch_assoc($res_annonces)) {
                 $titre = htmlspecialchars($a['titre']);
                 $prix  = number_format($a['prix'], 0, ',', ' ');
@@ -1654,27 +1445,17 @@ while ($row = mysqli_fetch_assoc($r)) {
         }
         ?>
       </div>
-
-      <!-- Pagination — générée par PHP -->
-      <div class="pagination" id="pagination">
-        <!-- <?php for($i=1; $i<=$total_pages; $i++): ?>
-        <button class="pg-btn <?= $i==$page?'active':'' ?>" onclick="goToPage(<?=$i?>)"><?=$i?></button>
-        <?php endfor; ?> -->
-      </div>
-
     </main>
-  </div><!-- end .body-wrap -->
+  </div>
 
-  <!-- FOOTER -->
   <footer class="footer">
-    © 2025 AUTOMARKET — Marketplace automobile algérienne &nbsp;·&nbsp;
+    © 2026 AUTOMARKET — Marketplace automobile algérienne &nbsp;·&nbsp;
     <a href="#">Aide</a> &nbsp;·&nbsp;
     <a href="#">Confidentialité</a> &nbsp;·&nbsp;
     <a href="#">Conditions d'utilisation</a>
   </footer>
 
   <script>
-    /* ══ DONNÉES PAR TYPE DE VÉHICULE ══════════════ */
     const DATA = {
       voiture: {
         marques: {
@@ -1692,9 +1473,9 @@ while ($row = mysqli_fetch_assoc($r)) {
           Mitsubishi:['Outlander','ASX','Eclipse Cross','L200','Pajero','Space Star'],
         },
         labels: { marque:'Marque', modele:'Modèle', km:'Kilomètres jusqu\'à', prix:'Prix jusqu\'à' },
-        count: '<?= $counts_type["voiture"] ?> annonces',
+        count: 'Rechercher',
         subtitle: 'Marketplace voitures — Algérie',
-        showElec: true, showPaiement: true, showAnnee: true,
+        showElec: true, showPaiement: true,
         kmOptions: ['10 000 km','30 000 km','50 000 km','80 000 km','100 000 km','150 000 km','200 000 km'],
       },
       moto: {
@@ -1709,9 +1490,9 @@ while ($row = mysqli_fetch_assoc($r)) {
           Lifan:['LF150','LF200','KP 150','LF250','SR 200','X-Pect'],
         },
         labels: { marque:'Marque moto', modele:'Modèle', km:'Kilomètres jusqu\'à', prix:'Prix jusqu\'à' },
-        count: '<?= $counts_type["moto"] ?> annonces',
+        count: 'Rechercher',
         subtitle: 'Marketplace motos — Algérie',
-        showElec: false, showPaiement: false, showAnnee: true,
+        showElec: false, showPaiement: false,
         kmOptions: ['5 000 km','10 000 km','20 000 km','40 000 km','60 000 km','80 000 km'],
       },
       camion: {
@@ -1726,9 +1507,9 @@ while ($row = mysqli_fetch_assoc($r)) {
           Hyundai:['HD72','HD78','HD120','HD160','HD250','Xcient'],
         },
         labels: { marque:'Fabricant', modele:'Modèle / Série', km:'Km jusqu\'à', prix:'Prix jusqu\'à' },
-        count: '<?= $counts_type["camion"] ?> annonces',
+        count: 'Rechercher',
         subtitle: 'Marketplace poids-lourds — Algérie',
-        showElec: false, showPaiement: true, showAnnee: true,
+        showElec: false, showPaiement: true,
         kmOptions: ['50 000 km','100 000 km','200 000 km','300 000 km','500 000 km','700 000 km'],
       },
     };
@@ -1742,32 +1523,29 @@ while ($row = mysqli_fetch_assoc($r)) {
         btn.classList.toggle('active', t === type);
         if (t === type) {
           btn.classList.remove('animating');
-          void btn.offsetWidth; /* force reflow pour relancer l'animation */
+          void btn.offsetWidth;
           btn.classList.add('animating');
           btn.addEventListener('animationend', () => btn.classList.remove('animating'), { once: true });
         }
       });
       const d = DATA[type];
-      /* subtitle */
       document.getElementById('hero-sub').textContent = d.subtitle;
-      /* labels */
       document.getElementById('lbl-marque').textContent = d.labels.marque;
       document.getElementById('lbl-modele').textContent = d.labels.modele;
       document.getElementById('lbl-km').textContent     = d.labels.km;
       document.getElementById('lbl-prix').textContent   = d.labels.prix;
-      /* count button */
       document.getElementById('btn-search-count').textContent = d.count;
-      /* km options */
+
       const selKm = document.getElementById('sel-km');
       selKm.innerHTML = '<option value="">Quelconque</option>';
       d.kmOptions.forEach(k => {
-        const o = document.createElement('option'); o.value = k; o.textContent = k;
+        const o = document.createElement('option');
+        o.value = k; o.textContent = k;
         selKm.appendChild(o);
       });
-      /* show/hide cols */
+
       document.getElementById('col-paiement').style.display = d.showPaiement ? '' : 'none';
       document.getElementById('sf-elec-row').style.display  = d.showElec     ? '' : 'none';
-      /* rebuild marques */
       buildMarques();
     }
 
@@ -1775,7 +1553,8 @@ while ($row = mysqli_fetch_assoc($r)) {
       const sel = document.getElementById('sel-marque');
       sel.innerHTML = '<option value="">Quelconque</option>';
       Object.keys(DATA[currentVType].marques).forEach(m => {
-        const o = document.createElement('option'); o.value = m; o.textContent = m;
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
         sel.appendChild(o);
       });
       document.getElementById('sel-modele').innerHTML = '<option value="">Quelconque</option>';
@@ -1783,110 +1562,98 @@ while ($row = mysqli_fetch_assoc($r)) {
 
     function updateModels() {
       const marque = document.getElementById('sel-marque').value;
-      const sel    = document.getElementById('sel-modele');
+      const sel = document.getElementById('sel-modele');
       sel.innerHTML = '<option value="">Quelconque</option>';
       const list = DATA[currentVType].marques[marque];
       if (list) list.forEach(m => {
-        const o = document.createElement('option'); o.value = m; o.textContent = m;
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
         sel.appendChild(o);
       });
     }
 
-    /* ── Search tabs ── */
     function setSTab(t) {
       ['buy','rent'].forEach(id => {
         document.getElementById('st-' + id).classList.toggle('active', id === t);
       });
     }
 
-    /* ── Mode paiement toggle ── */
     function setPayMode(m) {
-      document.getElementById('pay-achat').classList.toggle('active',  m==='achat');
+      document.getElementById('pay-achat').classList.toggle('active', m==='achat');
       document.getElementById('pay-credit').classList.toggle('active', m==='credit');
     }
 
-    /* ── Checkbox électrique ── */
     function toggleElec() {
       document.getElementById('chk-elec').classList.toggle('on');
     }
 
-    /* ── Reset search ── */
     function resetSearch() {
       document.getElementById('sel-marque').value = '';
       document.getElementById('sel-modele').innerHTML = '<option value="">Quelconque</option>';
-      document.getElementById('sel-annee').value  = '';
-      document.getElementById('sel-km').value     = '';
-      document.getElementById('sel-prix').value   = '';
+      document.getElementById('sel-annee').value = '';
+      document.getElementById('sel-km').value = '';
+      document.getElementById('sel-prix').value = '';
       document.getElementById('inp-wilaya').value = '';
       document.getElementById('chk-elec').classList.remove('on');
       setPayMode('achat');
     }
 
-    /* init */
     buildMarques();
 
-    /* ── Quick filter pills ────────────────────────── */
-    function togglePill(el) {
-      document.querySelectorAll('.qf-pill').forEach(p => p.classList.remove('active'));
-      el.classList.add('active');
+    /* ══ SIDEBAR OPEN / CLOSE ══ */
+    function openSidebar() {
+      document.getElementById('sidebar').classList.add('open');
+      document.getElementById('sidebar-overlay').classList.add('show');
+      document.getElementById('btn-filter-toggle').classList.add('hidden-btn');
+      document.body.style.overflow = 'hidden';
     }
 
-    /* ── Sidebar filter accordions ─────────────────── */
+    function closeSidebar() {
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('sidebar-overlay').classList.remove('show');
+      document.getElementById('btn-filter-toggle').classList.remove('hidden-btn');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeSidebar();
+    });
+
     function toggleFilter(head) {
-      const body  = head.nextElementSibling;
+      const body = head.nextElementSibling;
       const arrow = head.querySelector('.filter-arrow');
-      const isOpen = body.style.display !== 'none' && body.style.display !== '';
-      body.style.display  = isOpen ? 'none' : 'block';
+      const computed = window.getComputedStyle(body).display;
+      const isOpen = computed !== 'none';
+      body.style.display = isOpen ? 'none' : 'block';
       arrow.classList.toggle('open', !isOpen);
     }
 
-    /* ── Sidebar checkboxes ────────────────────────── */
     function toggleFChk(row) {
       row.querySelector('.fchk').classList.toggle('on');
     }
 
-    /* ── Reset filters ─────────────────────────────── */
     function resetFilters() {
       document.querySelectorAll('.fchk.on').forEach(c => c.classList.remove('on'));
     }
 
-    /* ── Favourite toggle ──────────────────────────── */
-    function toggleFav(id) {
-      const btn    = document.getElementById(id);
-      const isFaved = btn.classList.toggle('faved');
-      const svg    = btn.querySelector('svg');
-      svg.setAttribute('fill',   isFaved ? '#E24B4A' : 'none');
-      svg.setAttribute('stroke', isFaved ? '#E24B4A' : '#888');
-    }
-
-    /* ── View toggle (list / grid) ─────────────────── */
     function setView(btn) {
       btn.closest('.view-btns').querySelectorAll('.view-btn')
          .forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     }
 
-    /* ── Pagination ────────────────────────────────── */
-    document.querySelectorAll('.pg-btn').forEach(btn => {
-      btn.addEventListener('click', function () {
-        document.querySelectorAll('.pg-btn').forEach(b => b.classList.remove('active'));
-        if (this.textContent !== '…' && this.textContent !== '›') {
-          this.classList.add('active');
-        }
-      });
-    });
+    /* USER MENU */
     function toggleMenu() {
-  const d = document.getElementById('user-dropdown');
-  d.style.display = d.style.display === 'none' ? 'block' : 'none';
-}
+      const d = document.getElementById('user-dropdown');
+      d.style.display = d.style.display === 'none' ? 'block' : 'none';
+    }
 
-/* Fermer si on clique ailleurs */
-document.addEventListener('click', function(e) {
-  if (!e.target.closest('.user-menu') && !e.target.closest('#user-dropdown')) {
-    const d = document.getElementById('user-dropdown');
-    if (d) d.style.display = 'none';
-  }
-});
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.user-menu') && !e.target.closest('#user-dropdown')) {
+        const d = document.getElementById('user-dropdown');
+        if (d) d.style.display = 'none';
+      }
+    });
   </script>
 </body>
 </html>
