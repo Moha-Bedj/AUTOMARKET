@@ -1,3 +1,101 @@
+<?php
+session_start();
+require_once 'connexion.php';
+
+if (!isset($_SESSION['idUtilisateur'])) {
+  header('Location: inscription.php');
+  exit();
+}
+
+$idUser = mysqli_real_escape_string($conn, $_SESSION['idUtilisateur']);
+$res = mysqli_query($conn, "SELECT nom, prenom , numTel FROM Utilisateur WHERE idUtilisateur = '$idUser'");
+$user = mysqli_fetch_assoc($res);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+  $action = $_POST['action'] ?? '';
+
+  if ($action === 'vehicule') {
+    $typeVehicule = $_POST['typeVehicule'] ?? '';
+    $idMarque = $_POST['idMarque'] ?? '';
+    $idModele = $_POST['idModele'] ?? '';
+    $annee = $_POST['annee'] ?? '';
+    $carburant = $_POST['carburant'] ?? '';
+    $transmission = $_POST['transmission'] ?? '';
+    $kilometrage = $_POST['kilometrage'] ?? '';
+    $puissance = $_POST['puissance'] ?? '';
+    $etat = $_POST['etat'] ?? '';
+  }  
+
+
+
+
+  if ($action == 'annonce') {
+    /* Récupération des données */
+    $typeVehicule = $_POST['typeVehicule'] ?? '';
+    $idMarque     = $_POST['idMarque'] ?? '';
+    $idModele     = $_POST['idModele'] ?? '';
+    $annee        = (int)($_POST['annee'] ?? 0);
+    $carburant    = $_POST['carburant'] ?? '';
+    $transmission = $_POST['transmission'] ?? '';
+    $kilometrage  = (int)($_POST['kilometrage'] ?? 0);
+    $puissance    = (int)($_POST['puissance'] ?? 0);
+    $etat         = $_POST['etat'] ?? '';
+
+    $titre        = mysqli_real_escape_string($conn, $_POST['titre'] ?? '');
+    $description  = mysqli_real_escape_string($conn, $_POST['description'] ?? '');
+    $wilaya       = mysqli_real_escape_string($conn, $_POST['wilaya'] ?? '');
+    $prix         = (int)($_POST['prix'] ?? 0);
+    $telephone    = mysqli_real_escape_string($conn, $_POST['telephone'] ?? '');
+    $negociable   = isset($_POST['negociable']) ? 1 : 0;
+    $credit       = isset($_POST['credit']) ? 1 : 0;
+    $echange      = isset($_POST['echange']) ? 1 : 0;
+
+    /* Si l'utilisateur n'avait pas de téléphone, l'ajouter à son profil */
+    if (empty($user['numTel']) && !empty($telephone)) {
+        $tel = mysqli_real_escape_string($conn, $telephone);
+        mysqli_query($conn, "UPDATE Utilisateur SET numTel = '$tel' 
+                             WHERE idUtilisateur = '$idUser'");
+    }
+
+    /* 1. Insérer le Véhicule */
+    $sqlV = "INSERT INTO Vehicule 
+        (typeVehicule, idMarque, idModele, annee, carburant, transmission, kilometrage, puissance, etat)
+        VALUES 
+        ('$typeVehicule', '$idMarque', '$idModele', $annee, '$carburant', '$transmission', $kilometrage, $puissance, '$etat')";
+
+    if (!mysqli_query($conn, $sqlV)) {
+        echo json_encode(['success' => false, 'message' => 'Erreur véhicule : ' . mysqli_error($conn)]);
+        exit;
+    }
+    $idVehicule = mysqli_insert_id($conn);
+
+    /* 2. Insérer l'Annonce */
+    $sqlA = "INSERT INTO Annonce 
+        (idVendeur, idVehicule, titre, description, prix, localisation, datePublication, statutAnnonce, negociable, credit, echange)
+        VALUES 
+        ('$idUser', $idVehicule, '$titre', '$description', $prix, '$wilaya', NOW(), 'active', $negociable, $credit, $echange)";
+
+    if (!mysqli_query($conn, $sqlA)) {
+        echo json_encode(['success' => false, 'message' => 'Erreur annonce : ' . mysqli_error($conn)]);
+        exit;
+    }
+
+    $idAnnonce = mysqli_insert_id($conn);
+
+    /* 3. Redirection vers index.php avec message succès */
+    header('Location: index.php?publie=1&id=' . $idAnnonce);
+    exit;
+}
+
+
+  if($action == 'photo') {
+    $photos = $_FILES['photos'] ?? null;
+  }
+
+}  
+
+?>
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -136,7 +234,7 @@
       border: 0.5px solid var(--bd);
       border-top: none;
       border-radius: 0 0 var(--r10) var(--r10);
-      padding: 24px;
+      padding: 34px;
     }
 
     .section-head {
@@ -190,7 +288,43 @@
       background-position: right 10px center;
       cursor: pointer;
     }
+    .field input[readonly] {
+      background: var(--bg1);
+      color: var(--t2);
+      border-color: var(--bd);
+    }
+    .field input[readonly]:focus {
+      border-color: var(--bd);
+      box-shadow: none;
+    }
+    .tel-row {
+      display: flex;
+      gap: 8px;
+    }
+    .tel-prefix {
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      border: 0.5px solid var(--bd2);
+      border-radius: var(--r8);
+      background: var(--bg1);
+      font-size: 13px;
+      color: var(--t2);
+      font-weight: 500;
+    }
+    .tel-row input { 
+      flex: 1; 
+    }
 
+    .field input[readonly] {
+      background: var(--bg1);
+      color: var(--t2);
+      border-color: var(--bd);
+    }
+    .field input[readonly]:focus {
+      border-color: var(--bd);
+      box-shadow: none;
+    }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 
@@ -566,11 +700,40 @@
         <div class="grid2">
           <div class="field">
             <label>Nom complet</label>
-            <input type="text" name="nom_contact" placeholder="Votre nom">
+            <input type="text" name="nom_contact" placeholder="Votre nom" value="<?= htmlspecialchars(($user['prenom'] ?? '') . ' ' . ($user['nom'] ?? '')) ?>" readonly>
           </div>
           <div class="field">
-            <label>Téléphone</label>
-            <input type="tel" name="telephone" placeholder="05XX XX XX XX" required>
+            <label>
+              Téléphone
+              <?php if (!empty($user['numTel'])): ?>
+                
+              <?php endif; ?>
+            </label>
+
+            <?php if (!empty($user['numTel'])): ?>
+              <!-- Téléphone existe → readonly -->
+              <div class="tel-row">
+                <div class="tel-prefix">+213</div>
+                <input type="tel" 
+                      name="telephone" 
+                      value="<?= htmlspecialchars($user['numTel']) ?>" 
+                      readonly>
+              </div>
+            <?php else: ?>
+              <!-- Pas de téléphone → saisie manuelle -->
+              <div class="tel-row">
+                <div class="tel-prefix">+213</div>
+                <input type="tel" 
+                      name="telephone" 
+                      placeholder="5XXXXXXXX" 
+                      maxlength="9"
+                      oninput="validatePhoneInput(this)"
+                      required>
+              </div>
+              <div style="font-size:11px;color:var(--t3);margin-top:4px">
+                Votre téléphone sera aussi enregistré dans votre profil
+              </div>
+            <?php endif; ?>
           </div>
         </div>
       </div>
@@ -689,6 +852,13 @@ function buildResume() {
   document.getElementById('r-wilaya').textContent = f.wilaya.value;
   const prix = parseInt(f.prix.value||0);
   document.getElementById('r-prix').textContent   = prix ? prix.toLocaleString()+' DA' : '—';
+}
+function validatePhoneInput(input) {
+  let value = input.value.replace(/[^0-9]/g, '');
+  if (value.length > 0 && !['5','6','7'].includes(value[0])) {
+    value = value.substring(1);
+  }
+  input.value = value.substring(0, 9);
 }
 </script>
 
