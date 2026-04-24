@@ -15,15 +15,10 @@ $msgType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     if ($_POST['action'] === 'update_profil') {
-        $nom    = trim($_POST['nom'] ?? '');
-        $prenom = trim($_POST['prenom'] ?? '');
-        $tel    = trim($_POST['tel'] ?? '');
-        $wilaya = trim($_POST['wilaya'] ?? '');
+       $tel    = trim($_POST['tel'] ?? '');
+$wilaya = trim($_POST['wilaya'] ?? '');
 
-        if (!$nom || !$prenom) {
-            $msg = 'Nom et prénom sont obligatoires';
-            $msgType = 'error';
-        } elseif ($tel && !preg_match('/^[567][0-9]{8}$/', $tel)) {
+if ($tel && !preg_match('/^[567][0-9]{8}$/', $tel)) {
             $msg = 'Numéro de téléphone invalide (ex: 5XXXXXXXX)';
             $msgType = 'error';
         } else {
@@ -32,13 +27,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $t = mysqli_real_escape_string($conn, $tel);
             $w = mysqli_real_escape_string($conn, $wilaya);
 
-            $ok = mysqli_query($conn, "UPDATE Utilisateur 
-                SET nom='$n', prenom='$p', numTel='$t', wilaya='$w' 
-                WHERE idUtilisateur='$id'");
+           $ok = mysqli_query($conn, "UPDATE Utilisateur 
+    SET numTel='$t', wilaya='$w' 
+    WHERE idUtilisateur='$id'");
 
             if ($ok) {
-                $_SESSION['nom']    = $nom;
-                $_SESSION['prenom'] = $prenom;
+               
                 $msg = 'Profil mis à jour avec succès';
                 $msgType = 'success';
             } else {
@@ -536,6 +530,18 @@ if ($r3) $stats['favoris'] = mysqli_fetch_assoc($r3)['n'];
       .form-actions { flex-direction: column; }
       .form-actions button { width: 100%; }
     }
+    .static-field {
+  width: 100%;
+  min-height: 40px;
+  border: 0.5px solid var(--bd2);
+  border-radius: var(--r8);
+  padding: 10px 12px;
+  font-size: 14px;
+  background: var(--bg1);
+  color: var(--t1);
+  display: flex;
+  align-items: center;
+}
   </style>
 </head>
 <body>
@@ -633,16 +639,16 @@ if ($r3) $stats['favoris'] = mysqli_fetch_assoc($r3)['n'];
         </div>
       </div>
 
-      <div class="row2">
-        <div>
-          <label class="label">Prénom *</label>
-          <input type="text" name="prenom" value="<?= htmlspecialchars($user['prenom']) ?>" required>
-        </div>
-        <div>
-          <label class="label">Nom *</label>
-          <input type="text" name="nom" value="<?= htmlspecialchars($user['nom']) ?>" required>
-        </div>
-      </div>
+    <div class="row2">
+  <div>
+    <label class="label">Prénom</label>
+    <div class="static-field"><?= htmlspecialchars($user['prenom']) ?: '-' ?></div>
+  </div>
+  <div>
+    <label class="label">Nom</label>
+    <div class="static-field"><?= htmlspecialchars($user['nom']) ?: '-' ?></div>
+  </div>
+</div>
 
       <div class="field">
         <label class="label">Adresse e-mail</label>
