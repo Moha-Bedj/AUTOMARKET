@@ -1769,7 +1769,7 @@ body {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
           Réinitialiser
         </span>
-        <span class="sf-footer-link">
+        <span class="sf-footer-link" onclick="openAdvancedFilters()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
           Filtres avancés
         </span>
@@ -2176,6 +2176,15 @@ body {
       const q = document.getElementById('ai-search-input').value.trim();
       if (q) alert('Recherche IA : ' + q);
     }
+    function openAdvancedFilters() {
+  document.getElementById('advancedFilters').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeAdvancedFilters() {
+  document.getElementById('advancedFilters').classList.remove('show');
+  document.body.style.overflow = '';
+}
 
     buildMarques();
 
@@ -2212,6 +2221,16 @@ body {
         behavior: 'smooth'
       });
     }
+    function openAdvancedFilters() {
+  document.getElementById('advancedFilters').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  buildAdvMarques();
+}
+
+function closeAdvancedFilters() {
+  document.getElementById('advancedFilters').classList.remove('show');
+  document.body.style.overflow = '';
+}
 
     function toggleFav(id, btn) {
       const fd = new FormData();
@@ -2317,5 +2336,6 @@ body {
     }
   });
   </script>
+  <?php include 'filtresAvances.php'; ?>
 </body>
 </html>

@@ -1,3 +1,5 @@
+
+    
 <style>
 .advanced-overlay {
   position: fixed;
@@ -175,6 +177,16 @@ input[type=number] {
   background: #fff;
   transition: all .2s ease;
 }
+.sf-input {
+  width: 100%;
+  height: 42px;
+  border: 0.5px solid var(--bd2);
+  border-radius: var(--r8);
+  padding: 0 12px;
+  font-size: 14px;
+  background: #fff;
+  outline: none;
+}
 
 .color-option:hover {
   transform: translateY(-2px);
@@ -278,6 +290,7 @@ input[type=number] {
 }
 </style>
 
+    
 <!-- FILTRES AVANCÉS -->
 <div class="advanced-overlay" id="advancedFilters">
   <div class="advanced-panel">
@@ -292,32 +305,66 @@ input[type=number] {
 
   <div class="range-grid">
 
-    <!-- MARQUE -->
     <div class="range-field">
       <label>Marque</label>
-      <select id="adv-marque" class="sf-select" onchange="updateAdvModels()">
-        <option value="">Toutes</option>
-      </select>
+      <input class="sf-input" type="text" id="adv-marque" placeholder="Ex: Peugeot" list="adv-marques-list">
     </div>
 
-    <!-- MODELE -->
     <div class="range-field">
       <label>Modèle</label>
-      <select id="adv-modele" class="sf-select" onchange="updateAdvVersions()">
-        <option value="">Tous</option>
-      </select>
+      <input class="sf-input" type="text" id="adv-modele" placeholder="Ex: 208" list="adv-modeles-list">
     </div>
 
-    <!-- VARIANTE -->
     <div class="range-field">
       <label>Variante</label>
-      <select id="adv-version" class="sf-select">
-        <option value="">Toutes</option>
-      </select>
+      <input class="sf-input" type="text" id="adv-version" placeholder="Ex: GT Line" list="adv-versions-list">
     </div>
 
   </div>
 </div>
+
+<datalist id="adv-marques-list">
+  <option value="Toyota">
+  <option value="Hyundai">
+  <option value="Renault">
+  <option value="Peugeot">
+  <option value="Volkswagen">
+  <option value="BMW">
+  <option value="Mercedes">
+  <option value="Kia">
+  <option value="Dacia">
+  <option value="Ford">
+  <option value="Suzuki">
+  <option value="Mitsubishi">
+</datalist>
+
+<datalist id="adv-modeles-list">
+  <option value="208">
+  <option value="308">
+  <option value="3008">
+  <option value="Clio">
+  <option value="Megane">
+  <option value="Golf">
+  <option value="Polo">
+  <option value="Tucson">
+  <option value="Corolla">
+  <option value="Yaris">
+  <option value="Série 3">
+  <option value="Classe C">
+</datalist>
+
+<datalist id="adv-versions-list">
+  <option value="Active">
+  <option value="Allure">
+  <option value="GT Line">
+  <option value="Style">
+  <option value="Business">
+  <option value="Sport">
+  <option value="AMG Line">
+  <option value="M Pack">
+  <option value="Intens">
+  <option value="Techno">
+</datalist>
     <div class="adv-section">
       <h3>Équipements & confort</h3>
 
