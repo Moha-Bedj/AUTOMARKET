@@ -2224,7 +2224,6 @@ function closeAdvancedFilters() {
     function openAdvancedFilters() {
   document.getElementById('advancedFilters').classList.add('show');
   document.body.style.overflow = 'hidden';
-  buildAdvMarques();
 }
 
 function closeAdvancedFilters() {
@@ -2316,6 +2315,131 @@ function closeAdvancedFilters() {
       currentText.substring(0, charIndex) + (cursorVisible ? "|" : "")
     );
   }
+  function onlyNumbers(input) {
+
+  input.value = input.value.replace(/[^0-9]/g, '');
+
+}
+
+function checkRangePair(minId, maxId, label) {
+
+  const minInput = document.getElementById(minId);
+
+  const maxInput = document.getElementById(maxId);
+
+  if (!minInput || !maxInput) return null;
+
+  const min = minInput.value !== '' ? Number(minInput.value) : null;
+
+  const max = maxInput.value !== '' ? Number(maxInput.value) : null;
+
+  minInput.classList.remove('error');
+
+  maxInput.classList.remove('error');
+
+  if (min !== null && min < 0) minInput.value = 0;
+
+  if (max !== null && max < 0) maxInput.value = 0;
+
+  if (min !== null && max !== null && min > max) {
+
+    minInput.classList.add('error');
+
+    maxInput.classList.add('error');
+
+    return label + " : la valeur minimum doit être inférieure à la valeur maximum.";
+
+  }
+
+  return null;
+
+}
+
+function checkRanges() {
+
+  const errorBox = document.getElementById('range-error');
+
+  const errors = [
+
+    checkRangePair('annee-min', 'annee-max', 'Année'),
+
+    checkRangePair('prix-min', 'prix-max', 'Prix'),
+
+    checkRangePair('km-min', 'km-max', 'Kilométrage'),
+
+    checkRangePair('perf-min', 'perf-max', 'Performance'),
+
+    checkRangePair('cylindree-min', 'cylindree-max', 'Cylindrée moteur'),
+
+    checkRangePair('reservoir-min', 'reservoir-max', 'Taille du réservoir'),
+
+    checkRangePair('poids-min', 'poids-max', 'Poids')
+
+  ].filter(Boolean);
+
+  if (errors.length > 0) {
+
+    if (errorBox) {
+
+      errorBox.textContent = errors[0];
+
+      errorBox.classList.remove('hidden');
+
+    }
+
+    return false;
+
+  }
+
+  if (errorBox) errorBox.classList.add('hidden');
+
+  return true;
+
+}
+
+function resetAdvancedFilters() {
+
+  const box = document.getElementById('advancedFilters');
+
+  if (!box) return;
+
+  box.querySelectorAll('input').forEach(input => {
+
+    if (input.type === 'checkbox' || input.type === 'radio') {
+
+      input.checked = false;
+
+    } else {
+
+      input.value = '';
+
+    }
+
+    input.classList.remove('error');
+
+  });
+
+  box.querySelectorAll('select').forEach(select => {
+
+    select.selectedIndex = 0;
+
+  });
+
+  const vendeurDefault = box.querySelector('input[name="vendeur"]');
+
+  if (vendeurDefault) vendeurDefault.checked = true;
+
+  const errorBox = document.getElementById('range-error');
+
+  if (errorBox) {
+
+    errorBox.textContent = '';
+
+    errorBox.classList.add('hidden');
+
+  }
+
+}
 
   window.addEventListener("load", () => {
     typeAiSearch();
