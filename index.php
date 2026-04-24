@@ -879,6 +879,11 @@ body {
 .deals-nav-right { 
   right: -24px; 
 }
+.deals-nav.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.85);
+}
 
 .deal-card {
   flex: 0 0 270px;
@@ -1790,7 +1795,7 @@ body {
     </div>
 
     <div class="deals-carousel-wrap">
-      <button class="deals-nav deals-nav-left" onclick="scrollDeals(-1)" aria-label="Précédent">
+      <button class="deals-nav deals-nav-left" onclick="scrollDeals(-3)" aria-label="Précédent">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <path d="m15 18-6-6 6-6"/>
         </svg>
@@ -1885,7 +1890,7 @@ body {
         <?php }} ?>
       </div>
 
-      <button class="deals-nav deals-nav-right" onclick="scrollDeals(1)" aria-label="Suivant">
+      <button class="deals-nav deals-nav-right" onclick="scrollDeals(3)" aria-label="Suivant">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
           <path d="m9 18 6-6-6-6"/>
         </svg>
@@ -2213,14 +2218,50 @@ function closeAdvancedFilters() {
       }
     });
 
-    function scrollDeals(direction) {
-      const scroll = document.getElementById('deals-scroll');
-      const cardWidth = 294;
-      scroll.scrollBy({
-        left: direction * cardWidth * 2,
-        behavior: 'smooth'
-      });
+    function updateDealsArrows() {
+    const scrollBox = document.getElementById("deals-scroll");
+    const leftBtn = document.querySelector(".deals-nav-left");
+    const rightBtn = document.querySelector(".deals-nav-right");
+
+    if (!scrollBox || !leftBtn || !rightBtn) return;
+
+    const maxScroll = scrollBox.scrollWidth - scrollBox.clientWidth;
+
+    if (scrollBox.scrollLeft <= 5) {
+      leftBtn.classList.add("is-hidden");
+    } else {
+      leftBtn.classList.remove("is-hidden");
     }
+
+    if (scrollBox.scrollLeft >= maxScroll - 5) {
+      rightBtn.classList.add("is-hidden");
+    } else {
+      rightBtn.classList.remove("is-hidden");
+    }
+  }
+
+  function scrollDeals(direction) {
+    const scrollBox = document.getElementById("deals-scroll");
+    if (!scrollBox) return;
+
+    scrollBox.scrollBy({
+      left: direction * 300,
+      behavior: "smooth"
+    });
+
+    setTimeout(updateDealsArrows, 350);
+  }
+
+  window.addEventListener("load", () => {
+    updateDealsArrows();
+
+    const scrollBox = document.getElementById("deals-scroll");
+    if (scrollBox) {
+      scrollBox.addEventListener("scroll", updateDealsArrows);
+    }
+  });
+
+  window.addEventListener("resize", updateDealsArrows); 
     function openAdvancedFilters() {
   document.getElementById('advancedFilters').classList.add('show');
   document.body.style.overflow = 'hidden';
