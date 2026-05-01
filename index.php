@@ -1631,12 +1631,19 @@ body {
 
         <div id="user-dropdown" class="dropdown" style="display:none">
           <a href="monprofil.php" class="dropdown-item">Mon profil</a>
-          <a href="mesannonces.php" class="dropdown-item">Mes annonces</a>
-          <a href="favoris.php" class="dropdown-item">Mes favoris</a>
-          <hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
-          <a href="deconnexion.php" class="dropdown-item" style="color:var(--red)">Se déconnecter</a>
+<a href="mesannonces.php" class="dropdown-item">Mes annonces</a>
+<a href="favoris.php" class="dropdown-item">Mes favoris</a>
+
+<?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+  <a href="admin_dashboard.php" class="dropdown-item" style="color:var(--blue);font-weight:600">
+    Dashboard admin
+  </a>
+<?php endif; ?>
+
+<hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
+<a href="deconnexion.php" class="dropdown-item" style="color:var(--red)">Se déconnecter</a>
         </div>
-      <?php else: ?>
+        <?php else: ?>
         <button class="nav-btn btn-fill" onclick="location.href='inscription.php'">Connexion</button>
       <?php endif; ?>
     </div>

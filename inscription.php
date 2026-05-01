@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $prenom = trim($_POST['prenom'] ?? '');
         $uid    = trim($_POST['uid']    ?? '');
         $photo  = trim($_POST['photo']  ?? '');
+        $role = 'utilisateur';
 
         if (!$email) {
             echo json_encode(['success'=>false,'message'=>'Email manquant']);
@@ -55,6 +56,7 @@ if (mysqli_num_rows($res) == 0) {
     $id     = $user['idUtilisateur'];
     $nom    = $user['nom'];
     $prenom = $user['prenom'];
+    $role = $user['role'];
 }
 
         $_SESSION['idUtilisateur'] = $id;
@@ -62,6 +64,8 @@ if (mysqli_num_rows($res) == 0) {
         $_SESSION['nom']           = $nom;
         $_SESSION['prenom']        = $prenom;
         $_SESSION['photo']         = $photo;
+        $_SESSION['role'] = $role;
+        
 
         echo json_encode(['success' => true]);
         exit;
@@ -150,6 +154,7 @@ if ($action === 'login') {
     $_SESSION['email']         = $user['email'];
     $_SESSION['nom']           = $user['nom'];
     $_SESSION['prenom']        = $user['prenom'];
+    $_SESSION['role'] = $user['role'];
 
     echo json_encode(['success'=>true]);
     exit;
