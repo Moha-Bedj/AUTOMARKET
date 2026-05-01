@@ -52,6 +52,8 @@ $totalFavoris = mysqli_num_rows($result);
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mes favoris — AUTOMARKET</title>
+  <link rel="icon" href="images/logo.png">
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
