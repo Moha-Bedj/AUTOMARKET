@@ -108,6 +108,8 @@ if ($r3) $stats['favoris'] = mysqli_fetch_assoc($r3)['n'];
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mon profil — AUTOMARKET</title>
+    <link rel="icon" href="images/logo.png">
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

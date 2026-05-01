@@ -26,6 +26,7 @@ if ($r) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AUTOMARKET — Marketplace Automobile Algérienne</title>
+  <link rel="icon" href="images/logo.png">
   <style>
     *, *::before, *::after { 
   box-sizing: border-box; 
@@ -1552,14 +1553,6 @@ body {
       <img src="images/id.png" alt="" style="height:34px;width:auto;display:block;" id="logo-id">
     </a>
 
-    <div class="nav-search">
-      <svg class="nav-search-icon" width="14" height="14" viewBox="0 0 24 24"
-           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-      </svg>
-      <input type="text" placeholder="Marque, Modèle, Version…">
-    </div>
-
     <div class="nav-links">
       <div class="nav-fav" title="Notifications">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
@@ -1791,7 +1784,7 @@ body {
       <h2 class="deals-title">
         Top <span class="deals-badge">DEALS</span> pour vous
       </h2>
-      <a href="#" class="deals-view-all">Tout afficher →</a>
+      <a href="recherche.php" class="deals-view-all">Tout afficher →</a>
     </div>
 
     <div class="deals-carousel-wrap">
@@ -1806,7 +1799,8 @@ body {
         $sql_deals = "
             SELECT
                 a.idAnnonce, a.titre, a.prix, a.localisation, a.datePublication,
-                v.annee, v.kilometrage, v.carburant, v.transmission, v.puissance
+                v.annee, v.kilometrage, v.carburant, v.transmission, v.puissance,
+                (SELECT urlPhoto FROM Photos WHERE idAnnonce = a.idAnnonce ORDER BY ordrePhoto ASC LIMIT 1) AS photo_principale
             FROM Annonce a, Vehicule v
             WHERE a.idVehicule = v.idVehicule
             AND a.statutAnnonce = 'active'
@@ -1826,19 +1820,22 @@ body {
                 $trans = htmlspecialchars($d['transmission']);
                 $puiss = $d['puissance'];
                 $idAnn = $d['idAnnonce'];
+                $photoD = $d['photo_principale'] ?? null;
         ?>
-        <div class="deal-card" onclick="location.href='fiche_annonce.php?id=<?= $idAnn ?>'">
-          <div class="deal-img">
-            <button class="deal-fav" onclick="event.stopPropagation();toggleFav(<?= $idAnn ?>, this)">
+        <div class="deal-card" onclick="location.href='ficheAnnonces.php?id=<?= $idAnn ?>'">
+          <div class="deal-img" <?= $photoD ? 'style="background-image:url(\''.htmlspecialchars($photoD).'\');background-size:cover;background-position:center"' : '' ?>>
+            <button class="deal-fav" onclick="event.stopPropagation();toggleFav('<?= $idAnn ?>', this)">
               <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M11.29 20.66c.2.2.45.29.71.29s.51-.1.71-.29l7.5-7.5c2.35-2.35 2.35-6.05 0-8.41-2.3-2.28-5.85-2.35-8.21-.2-2.36-2.15-5.91-2.09-8.21.2-2.35 2.36-2.35 6.06 0 8.41z"/>
               </svg>
             </button>
+            <?php if (!$photoD): ?>
             <svg class="deal-placeholder" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.8">
               <rect x="1" y="6" width="22" height="13" rx="3"/>
               <circle cx="7" cy="16" r="1.5"/>
               <circle cx="17" cy="16" r="1.5"/>
             </svg>
+            <?php endif; ?>
           </div>
 
           <div class="deal-body">
@@ -1955,7 +1952,8 @@ body {
                 a.idAnnonce, a.titre, a.prix, a.localisation,
                 a.datePublication, a.vendeurVerif,
                 v.annee, v.kilometrage, v.carburant, v.transmission,
-                u.nom AS vendeur_nom, u.prenom AS vendeur_prenom
+                u.nom AS vendeur_nom, u.prenom AS vendeur_prenom,
+                (SELECT urlPhoto FROM Photos WHERE idAnnonce = a.idAnnonce ORDER BY ordrePhoto ASC LIMIT 1) AS photo_principale
             FROM Annonce a, Vehicule v, Utilisateur u
             WHERE a.idVehicule = v.idVehicule
             AND a.idVendeur = u.idUtilisateur
@@ -1985,15 +1983,29 @@ body {
                 elseif ($diff == 1) $dl = "Hier";
                 else                $dl = "Il y a $diff jours";
 
+                $photo = $a['photo_principale'] ?? null;
+                if ($photo) {
+                    $photoEsc = htmlspecialchars($photo);
+                    $imgBlock = "<img src='$photoEsc' alt='$titre' onerror=\"this.style.display='none';this.nextElementSibling.style.display='flex';\">
+                                 <div class='lcard-img-ph' style='display:none'>
+                                   <svg width='44' height='44' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='0.8'>
+                                     <rect x='1' y='6' width='22' height='13' rx='3'/>
+                                     <circle cx='7' cy='16' r='1.5'/><circle cx='17' cy='16' r='1.5'/>
+                                   </svg>
+                                 </div>";
+                } else {
+                    $imgBlock = "<div class='lcard-img-ph'>
+                                   <svg width='44' height='44' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='0.8'>
+                                     <rect x='1' y='6' width='22' height='13' rx='3'/>
+                                     <circle cx='7' cy='16' r='1.5'/><circle cx='17' cy='16' r='1.5'/>
+                                   </svg>
+                                 </div>";
+                }
+
                 echo "
                 <div class='lcard' onclick=\"location.href='fiche_annonce.php?id={$a['idAnnonce']}'\">
                   <div class='lcard-img'>
-                    <div class='lcard-img-ph'>
-                      <svg width='44' height='44' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='0.8'>
-                        <rect x='1' y='6' width='22' height='13' rx='3'/>
-                        <circle cx='7' cy='16' r='1.5'/><circle cx='17' cy='16' r='1.5'/>
-                      </svg>
-                    </div>
+                    $imgBlock
                   </div>
                   <div class='lcard-body'>
                     <div class='lcard-top'>
