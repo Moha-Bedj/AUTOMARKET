@@ -1,5 +1,8 @@
+
+
 <?php
 session_start();
+require_once 'auth_admin.php';
 require_once 'connexion.php';
 
 $sql = "
