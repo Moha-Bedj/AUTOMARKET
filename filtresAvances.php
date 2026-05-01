@@ -304,67 +304,26 @@ input[type=number] {
   <h3>Identification du véhicule</h3>
 
   <div class="range-grid">
-
     <div class="range-field">
       <label>Marque</label>
-      <input class="sf-input" type="text" id="adv-marque" placeholder="Ex: Peugeot" list="adv-marques-list">
+     <input class="sf-input" type="text" id="adv-marque" placeholder="Ex: Peugeot" list="adv-marques-list" oninput="updateAdvModeles()">
     </div>
 
     <div class="range-field">
       <label>Modèle</label>
-      <input class="sf-input" type="text" id="adv-modele" placeholder="Ex: 208" list="adv-modeles-list">
+    <input class="sf-input" type="text" id="adv-modele" placeholder="Ex: 208" list="adv-modeles-list" oninput="updateAdvVersions()">
     </div>
 
     <div class="range-field">
       <label>Variante</label>
-      <input class="sf-input" type="text" id="adv-version" placeholder="Ex: GT Line" list="adv-versions-list">
+   <input class="sf-input" type="text" id="adv-version" placeholder="Ex: GT Line" list="adv-versions-list">
     </div>
-
   </div>
 </div>
 
-<datalist id="adv-marques-list">
-  <option value="Toyota">
-  <option value="Hyundai">
-  <option value="Renault">
-  <option value="Peugeot">
-  <option value="Volkswagen">
-  <option value="BMW">
-  <option value="Mercedes">
-  <option value="Kia">
-  <option value="Dacia">
-  <option value="Ford">
-  <option value="Suzuki">
-  <option value="Mitsubishi">
-</datalist>
-
-<datalist id="adv-modeles-list">
-  <option value="208">
-  <option value="308">
-  <option value="3008">
-  <option value="Clio">
-  <option value="Megane">
-  <option value="Golf">
-  <option value="Polo">
-  <option value="Tucson">
-  <option value="Corolla">
-  <option value="Yaris">
-  <option value="Série 3">
-  <option value="Classe C">
-</datalist>
-
-<datalist id="adv-versions-list">
-  <option value="Active">
-  <option value="Allure">
-  <option value="GT Line">
-  <option value="Style">
-  <option value="Business">
-  <option value="Sport">
-  <option value="AMG Line">
-  <option value="M Pack">
-  <option value="Intens">
-  <option value="Techno">
-</datalist>
+<datalist id="adv-marques-list"></datalist>
+<datalist id="adv-modeles-list"></datalist>
+<datalist id="adv-versions-list"></datalist>
     <div class="adv-section">
       <h3>Équipements & confort</h3>
 

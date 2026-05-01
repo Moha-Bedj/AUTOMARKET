@@ -3,6 +3,43 @@ session_start();
 require_once 'connexion.php';
 $publie = isset($_GET['publie']) && $_GET['publie'] == '1';
 $counts_type = ['voiture' => 0, 'moto' => 0, 'camion' => 0];
+$marquesDB = [];
+
+$sql = "
+SELECT 
+  ma.idMarque,
+  ma.nomMarque,
+  mo.idModele,
+  mo.nomModele,
+  ve.idVersion,
+  ve.nomVersion
+FROM marque ma
+LEFT JOIN modele mo ON mo.idMarque = ma.idMarque
+LEFT JOIN version ve ON ve.idModele = mo.idModele
+ORDER BY ma.nomMarque, mo.nomModele, ve.nomVersion
+";
+
+$res = mysqli_query($conn, $sql);
+
+if ($res) {
+    while ($row = mysqli_fetch_assoc($res)) {
+        $marque = $row['nomMarque'];
+        $modele = $row['nomModele'];
+        $version = $row['nomVersion'];
+
+        if (!isset($marquesDB[$marque])) {
+            $marquesDB[$marque] = [];
+        }
+
+        if ($modele && !isset($marquesDB[$marque][$modele])) {
+            $marquesDB[$marque][$modele] = [];
+        }
+
+        if ($modele && $version) {
+            $marquesDB[$marque][$modele][] = $version;
+        }
+    }
+}
 
 $r = mysqli_query($conn, "
     SELECT v.typeVehicule, COUNT(*) as nb 
@@ -435,7 +472,8 @@ body {
 }
 
 .sf-grid-row1 { 
-  grid-template-columns: 1fr 1fr 1fr 1fr; 
+  grid-template-columns: repeat(4, 1fr);
+  align-items: start;
 }
 
 .sf-grid-row2 { 
@@ -965,6 +1003,7 @@ body {
   text-overflow: ellipsis;
 }
 
+
 .deal-price {
   display: flex;
   align-items: baseline;
@@ -1128,6 +1167,12 @@ body {
   margin-bottom: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+
+
+.hidden {
+  display: none;
 }
 
 .lspec { 
@@ -1677,35 +1722,38 @@ body {
         <div class="search-tab" id="st-rent" onclick="setSTab('rent')">Louer</div>
       </div>
 
-      <div class="sf-grid sf-grid-row1">
-        <div>
-          <div class="sf-label" id="lbl-marque">Marque</div>
-          <select class="sf-select" id="sel-marque" onchange="updateModels()">
-            <option value="">Quelconque</option>
-          </select>
-        </div>
-        <div>
-          <div class="sf-label" id="lbl-modele">Modèle</div>
-          <select class="sf-select" id="sel-modele">
-            <option value="">Quelconque</option>
-          </select>
-        </div>
-        <div id="col-annee">
-          <div class="sf-label">Année depuis</div>
-          <select class="sf-select" id="sel-annee">
-            <option value="">Quelconque</option>
-            <option>2024</option><option>2023</option><option>2022</option>
-            <option>2021</option><option>2020</option><option>2019</option>
-            <option>2018</option><option>≤ 2017</option>
-          </select>
-        </div>
-        <div id="col-km">
-          <div class="sf-label" id="lbl-km">Kilomètres jusqu'à</div>
-          <select class="sf-select" id="sel-km">
-            <option value="">Quelconque</option>
-          </select>
-        </div>
-      </div>
+    <div class="sf-grid sf-grid-row1">
+  <div>
+    <div class="sf-label" id="lbl-marque">Marque</div>
+    <select class="sf-select" id="sel-marque" onchange="updateModels()">
+      <option value="">Quelconque</option>
+    </select>
+  </div>
+
+  <div>
+    <div class="sf-label" id="lbl-modele">Modèle</div>
+    <select class="sf-select" id="sel-modele">
+      <option value="">Quelconque</option>
+    </select>
+  </div>
+
+  <div id="col-annee">
+    <div class="sf-label">Année depuis</div>
+    <select class="sf-select" id="sel-annee">
+      <option value="">Quelconque</option>
+      <option>2024</option><option>2023</option><option>2022</option>
+      <option>2021</option><option>2020</option><option>2019</option>
+      <option>2018</option><option>≤ 2017</option>
+    </select>
+  </div>
+
+  <div id="col-km">
+    <div class="sf-label" id="lbl-km">Kilomètres jusqu'à</div>
+    <select class="sf-select" id="sel-km">
+      <option value="">Quelconque</option>
+    </select>
+  </div>
+</div>
 
       <div class="sf-grid sf-grid-row2">
         <div id="col-paiement">
@@ -2035,22 +2083,98 @@ body {
   </footer>
 
   <script>
+    const MARQUES_DB = <?= json_encode($marquesDB, JSON_UNESCAPED_UNICODE); ?>;
+   function buildAdvMarques() {
+
+  const list = document.getElementById('adv-marques-list');
+
+  if (!list) return;
+
+  list.innerHTML = '';
+
+  Object.keys(MARQUES_DB).forEach(marque => {
+
+    const opt = document.createElement('option');
+
+    opt.value = marque;
+
+    list.appendChild(opt);
+
+  });
+}
+window.addEventListener('load', buildAdvMarques);
+function updateAdvModeles() {
+
+  const marqueInput = document.getElementById('adv-marque');
+
+  const modeleInput = document.getElementById('adv-modele');
+
+  const versionInput = document.getElementById('adv-version');
+
+  const modelesList = document.getElementById('adv-modeles-list');
+
+  const versionsList = document.getElementById('adv-versions-list');
+
+  if (!marqueInput || !modeleInput || !versionInput || !modelesList || !versionsList) return;
+
+  const marque = marqueInput.value.trim();
+
+  modeleInput.value = '';
+
+  versionInput.value = '';
+
+  modelesList.innerHTML = '';
+
+  versionsList.innerHTML = '';
+
+  const modeles = MARQUES_DB[marque];
+
+  if (!modeles) return;
+
+  Object.keys(modeles).forEach(modele => {
+
+    const opt = document.createElement('option');
+
+    opt.value = modele;
+
+    modelesList.appendChild(opt);
+
+  });
+}
+function updateAdvVersions() {
+
+  const marque = document.getElementById('adv-marque').value.trim();
+
+  const modele = document.getElementById('adv-modele').value.trim();
+
+  const versionInput = document.getElementById('adv-version');
+
+  const versionsList = document.getElementById('adv-versions-list');
+
+  if (!versionInput || !versionsList) return;
+
+  versionInput.value = '';
+
+  versionsList.innerHTML = '';
+
+  const versions = MARQUES_DB[marque]?.[modele];
+
+  if (!versions) return;
+
+  versions.forEach(version => {
+
+    const opt = document.createElement('option');
+
+    opt.value = version;
+
+    versionsList.appendChild(opt);
+
+  });
+
+}
     const DATA = {
       voiture: {
-        marques: {
-          Toyota:['Corolla','Yaris','Camry','RAV4','Hilux','Land Cruiser'],
-          Hyundai:['Tucson','Elantra','Santa Fe','i10','i30','Creta'],
-          Renault:['Clio','Megane','Duster','Kadjar','Logan','Talisman'],
-          Peugeot:['208','308','3008','5008','Partner','Rifter'],
-          Volkswagen:['Golf','Polo','Passat','Tiguan','T-Roc','Caddy'],
-          BMW:['Série 1','Série 3','Série 5','X1','X3','X5'],
-          Mercedes:['Classe A','Classe C','Classe E','GLC','GLE','Vito'],
-          Kia:['Sportage','Cerato','Picanto','Sorento','Stonic','Carnival'],
-          Dacia:['Duster','Logan','Sandero','Dokker','Lodgy','Spring'],
-          Ford:['Focus','Fiesta','Kuga','Puma','Ranger','Transit'],
-          Suzuki:['Swift','Vitara','Jimny','S-Cross','Ignis','Baleno'],
-          Mitsubishi:['Outlander','ASX','Eclipse Cross','L200','Pajero','Space Star'],
-        },
+        marques:MARQUES_DB,
         labels: { marque:'Marque', modele:'Modèle', km:'Kilomètres jusqu\'à', prix:'Prix jusqu\'à' },
         count: '<?= $counts_type["voiture"] ?> annonces',
         subtitle: 'Marketplace voitures — Algérie',
@@ -2139,18 +2263,23 @@ body {
       document.getElementById('sel-modele').innerHTML = '<option value="">Quelconque</option>';
     }
 
-    function updateModels() {
-      const marque = document.getElementById('sel-marque').value;
-      const sel = document.getElementById('sel-modele');
-      sel.innerHTML = '<option value="">Quelconque</option>';
-      const list = DATA[currentVType].marques[marque];
-      if (list) list.forEach(m => {
-        const o = document.createElement('option');
-        o.value = m; o.textContent = m;
-        sel.appendChild(o);
-      });
-    }
+  function updateModels() {
+  const marque = document.getElementById('sel-marque').value;
+  const sel = document.getElementById('sel-modele');
 
+  sel.innerHTML = '<option value="">Quelconque</option>';
+
+  const modeles = DATA[currentVType].marques[marque];
+
+  if (modeles) {
+    Object.keys(modeles).forEach(modele => {
+      const o = document.createElement('option');
+      o.value = modele;
+      o.textContent = modele;
+      sel.appendChild(o);
+    });
+  }
+}
     function setSTab(t) {
       ['buy','rent'].forEach(id => {
         document.getElementById('st-' + id).classList.toggle('active', id === t);
@@ -2165,25 +2294,31 @@ body {
     function toggleElec() {
       document.getElementById('chk-elec').classList.toggle('on');
     }
+function updateModels() {
+  const marque = document.getElementById('sel-marque').value;
+  const sel = document.getElementById('sel-modele');
 
-    function resetSearch() {
-      document.getElementById('sel-marque').value = '';
-      document.getElementById('sel-modele').innerHTML = '<option value="">Quelconque</option>';
-      document.getElementById('sel-annee').value = '';
-      document.getElementById('sel-km').value = '';
-      document.getElementById('sel-prix').value = '';
-      document.getElementById('inp-wilaya').value = '';
-      document.getElementById('chk-elec').classList.remove('on');
-      setPayMode('achat');
-    }
+  sel.innerHTML = '<option value="">Quelconque</option>';
 
+  const modeles = DATA[currentVType].marques[marque];
+
+  if (modeles) {
+    Object.keys(modeles).forEach(modele => {
+      const o = document.createElement('option');
+      o.value = modele;
+      o.textContent = modele;
+      sel.appendChild(o);
+    });
+  }
+}
     function doAISearch() {
       const q = document.getElementById('ai-search-input').value.trim();
       if (q) alert('Recherche IA : ' + q);
     }
-    function openAdvancedFilters() {
+ function openAdvancedFilters() {
   document.getElementById('advancedFilters').classList.add('show');
   document.body.style.overflow = 'hidden';
+  buildAdvMarques();
 }
 
 function closeAdvancedFilters() {
@@ -2308,40 +2443,40 @@ function closeAdvancedFilters() {
   let cursorVisible = true;
   let typingTimeout;
 
-  function typeAiSearch() {
-    if (!aiInput) return;
+ function typeAiSearch() {
+  if (!aiInput) return;
 
-    if (document.activeElement === aiInput || aiInput.value.trim() !== "") {
-      aiInput.setAttribute("placeholder", "");
-      return;
-    }
+  if (document.activeElement === aiInput || aiInput.value.trim() !== "") {
+    aiInput.setAttribute("placeholder", "");
+    return;
+  }
 
-    const currentText = aiSearchTexts[textIndex];
-    const cursor = cursorVisible ? "|" : "";
+  const currentText = aiSearchTexts[textIndex];
+  const cursor = cursorVisible ? "|" : "";
 
-    if (!isDeleting) {
-      charIndex++;
-      aiInput.setAttribute("placeholder", currentText.substring(0, charIndex) + cursor);
+  if (!isDeleting) {
+    charIndex++;
+    aiInput.setAttribute("placeholder", currentText.substring(0, charIndex) + cursor);
 
-      if (charIndex < currentText.length) {
-        typingTimeout = setTimeout(typeAiSearch, 85);
-      } else {
-        isDeleting = true;
-        typingTimeout = setTimeout(typeAiSearch, 1400);
-      }
+    if (charIndex < currentText.length) {
+      typingTimeout = setTimeout(typeAiSearch, 85);
     } else {
-      charIndex--;
-      aiInput.setAttribute("placeholder", currentText.substring(0, charIndex) + cursor);
+      isDeleting = true;
+      typingTimeout = setTimeout(typeAiSearch, 1400);
+    }
+  } else {
+    charIndex--;
+    aiInput.setAttribute("placeholder", currentText.substring(0, charIndex) + cursor);
 
-      if (charIndex > 0) {
-        typingTimeout = setTimeout(typeAiSearch, 40);
-      } else {
-        isDeleting = false;
-        textIndex = (textIndex + 1) % aiSearchTexts.length;
-        typingTimeout = setTimeout(typeAiSearch, 300);
-      }
+    if (charIndex > 0) {
+      typingTimeout = setTimeout(typeAiSearch, 40);
+    } else {
+      isDeleting = false;
+      textIndex = (textIndex + 1) % aiSearchTexts.length;
+      typingTimeout = setTimeout(typeAiSearch, 300);
     }
   }
+}
 
   function blinkPlaceholderCursor() {
     if (!aiInput) return;
@@ -2479,9 +2614,7 @@ function resetAdvancedFilters() {
     errorBox.classList.add('hidden');
 
   }
-
 }
-
   window.addEventListener("load", () => {
     typeAiSearch();
     setInterval(blinkPlaceholderCursor, 500);
