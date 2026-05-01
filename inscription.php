@@ -21,20 +21,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $e   = mysqli_real_escape_string($conn, $email);
         $res = mysqli_query($conn, "SELECT * FROM Utilisateur WHERE email='$e'");
+if (mysqli_num_rows($res) == 0) {
 
-        if (mysqli_num_rows($res) == 0) {
-            $n    = mysqli_real_escape_string($conn, $nom);
-            $p    = mysqli_real_escape_string($conn, $prenom);
-            $hash = password_hash($uid ?: uniqid(), PASSWORD_DEFAULT);
-            mysqli_query($conn, "INSERT INTO Utilisateur (nom,prenom,email,motDePasse,dateInscription)
-                                 VALUES ('$n','$p','$e','$hash',NOW())");
-            $id = mysqli_insert_id($conn);
-        } else {
-            $user   = mysqli_fetch_assoc($res);
-            $id     = $user['idUtilisateur'];
-            $nom    = $user['nom'];
-            $prenom = $user['prenom'];
-        }
+    $id = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+        mt_rand(0,0xffff), mt_rand(0,0xffff),
+        mt_rand(0,0xffff),
+        mt_rand(0,0x0fff) | 0x4000,
+        mt_rand(0,0x3fff) | 0x8000,
+        mt_rand(0,0xffff), mt_rand(0,0xffff), mt_rand(0,0xffff)
+    );
+
+    $n    = mysqli_real_escape_string($conn, $nom);
+    $p    = mysqli_real_escape_string($conn, $prenom);
+    $hash = password_hash($uid ?: uniqid(), PASSWORD_DEFAULT);
+
+    $ok = mysqli_query($conn, "
+        INSERT INTO Utilisateur 
+        (idUtilisateur, nom, prenom, email, motDePasse, statut, role, dateInscription, emailVerifie, badgeVerifie)
+        VALUES
+        ('$id', '$n', '$p', '$e', '$hash', 'actif', 'utilisateur', CURDATE(), 1, 0)
+    ");
+
+    if (!$ok) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Erreur SQL : ' . mysqli_error($conn)
+        ]);
+        exit;
+    }
+
+} else {
+    $user   = mysqli_fetch_assoc($res);
+    $id     = $user['idUtilisateur'];
+    $nom    = $user['nom'];
+    $prenom = $user['prenom'];
+}
 
         $_SESSION['idUtilisateur'] = $id;
         $_SESSION['email']         = $email;

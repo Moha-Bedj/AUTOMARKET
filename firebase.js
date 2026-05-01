@@ -57,7 +57,7 @@ window.loginGoogle = async function() {
       parts.slice(1).join(' '),
       parts[0] || '',
       user.uid,
-      user.photo
+      photo
     );
   } catch(e) {
     if (e.code !== 'auth/cancelled-popup-request') {
@@ -80,7 +80,8 @@ window.loginFacebook = async function() {
       user.email || '',
       parts.slice(1).join(' '),
       parts[0] || '',
-      user.uid
+      user.uid,
+      user.photoURL || ''
     );
   } catch(e) {
     if (e.code !== 'auth/cancelled-popup-request') {
@@ -88,21 +89,5 @@ window.loginFacebook = async function() {
     }
   } finally {
     authInProgress = false;
-  }
-};
-
-window.loginFacebook = async function() {
-  try {
-    const result = await signInWithPopup(auth, new FacebookAuthProvider());
-    const user   = result.user;
-    const parts  = (user.displayName || '').split(' ');
-    await saveUser(
-      user.email || '',
-      parts.slice(1).join(' '),
-      parts[0] || '',
-      user.uid
-    );
-  } catch(e) {
-    alert('Erreur Facebook : ' + e.message);
   }
 };
