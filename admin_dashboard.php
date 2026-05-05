@@ -36,6 +36,7 @@ $vendeursVerifies = mysqli_fetch_assoc(mysqli_query($conn, "
 <head>
 <meta charset="UTF-8">
 <title>Admin — Tableau de bord</title>
+<link rel="icon" href="images/logo.png">
 
 <style>
 * {
@@ -55,12 +56,13 @@ body {
   min-height: 100vh;
 }
 
-.sidebar {
-  width: 240px;
-  background: #0C447C;
-  color: white;
-  padding: 24px 18px;
+.sidebar{
+  width:250px;
+  background:#0C447C;
+  padding:24px 18px;
+  color:white
 }
+
 
 .logo {
   display: flex;

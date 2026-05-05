@@ -22,6 +22,7 @@ $res = mysqli_query($conn, $sql);
 <head>
 <meta charset="UTF-8">
 <title>Admin - Gestion des annonces</title>
+<link rel="icon" href="images/logo.png">
 
 <style>
 * {
@@ -41,12 +42,13 @@ body {
   min-height: 100vh;
 }
 
-.sidebar {
-  width: 250px;
-  background: #0C447C;
-  padding: 24px 18px;
-  color: white;
+.sidebar{
+  width:250px;
+  background:#0C447C;
+  padding:24px 18px;
+  color:white
 }
+
 
 .logo {
   display: flex;

@@ -36,17 +36,37 @@ if (mysqli_num_rows($res) == 0) {
     $p    = mysqli_real_escape_string($conn, $prenom);
     $hash = password_hash($uid ?: uniqid(), PASSWORD_DEFAULT);
 
-    $ok = mysqli_query($conn, "
-        INSERT INTO Utilisateur 
-        (idUtilisateur, nom, prenom, email, motDePasse, statut, role, dateInscription, emailVerifie, badgeVerifie)
-        VALUES
-        ('$id', '$n', '$p', '$e', '$hash', 'actif', 'utilisateur', CURDATE(), 1, 0)
-    ");
-
-    if (!$ok) {
+    /* Transaction pour cohérence Utilisateur + Acheteur + Vendeur */
+    mysqli_begin_transaction($conn);
+    
+    try {
+        $ok1 = mysqli_query($conn, "
+            INSERT INTO Utilisateur 
+            (idUtilisateur, nom, prenom, email, motDePasse, statut, role, dateInscription, emailVerifie, badgeVerifie)
+            VALUES
+            ('$id', '$n', '$p', '$e', '$hash', 'actif', 'utilisateur', CURDATE(), 1, 0)
+        ");
+        if (!$ok1) throw new Exception('Utilisateur : ' . mysqli_error($conn));
+        
+        /* Créer Acheteur (héritage UML) */
+        $ok2 = mysqli_query($conn, "INSERT INTO Acheteur (idUtilisateur) VALUES ('$id')");
+        if (!$ok2) throw new Exception('Acheteur : ' . mysqli_error($conn));
+        
+        /* Créer Vendeur (héritage UML) */
+        $ok3 = mysqli_query($conn, "
+            INSERT INTO Vendeur (idUtilisateur, typeVendeur, nbrAnnonceAct) 
+            VALUES ('$id', 'particulier', 0)
+        ");
+        if (!$ok3) throw new Exception('Vendeur : ' . mysqli_error($conn));
+        
+        mysqli_commit($conn);
+        $role = 'utilisateur';
+        
+    } catch (Exception $e) {
+        mysqli_rollback($conn);
         echo json_encode([
             'success' => false,
-            'message' => 'Erreur SQL : ' . mysqli_error($conn)
+            'message' => 'Erreur SQL : ' . $e->getMessage()
         ]);
         exit;
     }
@@ -664,7 +684,7 @@ if ($action === 'login') {
     .div-text  { font-size: 12px; color: var(--text-tertiary); white-space: nowrap; }
 
     /* ── SOCIAL BUTTONS ─────────────────────────────────── */
-    .social-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .social-grid { display: grid; }
     .social-btn {
       height: 38px;
       border: 0.5px solid var(--border-mid);
@@ -814,12 +834,7 @@ oninput="validatePhoneInput(this)">
           </svg>
           Google
         </button>
-        <button class="social-btn" onclick="loginFacebook()">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="#1877F2">
-            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-          </svg>
-          Facebook
-        </button>
+        
       </div>
 
       <div class="footer-link-row">

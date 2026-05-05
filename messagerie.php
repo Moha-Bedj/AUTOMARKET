@@ -19,48 +19,101 @@ mysqli_query($conn, "INSERT IGNORE INTO Vendeur (idUtilisateur, typeVendeur, nbr
 /* ════════════════════════════════════════════════════════ */
 /* ═══   CRÉER CONVERSATION SI ?vendeur=X&annonce=Y       ═══ */
 /* ════════════════════════════════════════════════════════ */
-$vendeurDest = $_GET['vendeur'] ?? '';
-$annonceContexte = $_GET['annonce'] ?? '';
-$idConvActive = $_GET['conv'] ?? '';
+$vendeurDest = trim($_GET['vendeur'] ?? '');
+$annonceContexte = trim($_GET['annonce'] ?? '');
+$idConvActive = trim($_GET['conv'] ?? '');
+$erreurMsg = ''; // Pour afficher un message d'erreur si besoin
 
-if ($vendeurDest && $annonceContexte && $vendeurDest !== $idUser) {
-    $vendDestSql = mysqli_real_escape_string($conn, $vendeurDest);
-    $annContSql = mysqli_real_escape_string($conn, $annonceContexte);
-
-    /* Auto-créer Acheteur/Vendeur destinataire si absent (sécurité) */
-    mysqli_query($conn, "INSERT IGNORE INTO Acheteur (idUtilisateur) VALUES ('$vendDestSql')");
-    mysqli_query($conn, "INSERT IGNORE INTO Vendeur (idUtilisateur, typeVendeur, nbrAnnonceAct) VALUES ('$vendDestSql', 'particulier', 0)");
-
-    /* Vérifier si conversation existe déjà */
-    $rExist = mysqli_query($conn, "
-        SELECT idConversation 
-        FROM Conversation 
-        WHERE idAcheteur='$idUserSql' 
-        AND idVendeur='$vendDestSql' 
-        AND idAnnonce='$annContSql'
-        LIMIT 1
-    ");
+/* Si on tente de créer une conversation, on VALIDE TOUT avant */
+if ($vendeurDest !== '' || $annonceContexte !== '') {
     
-    if ($rExist && mysqli_num_rows($rExist) > 0) {
-        $idConvActive = mysqli_fetch_assoc($rExist)['idConversation'];
-    } else {
-        /* Créer nouvelle conversation */
-        $idConvNew = bin2hex(random_bytes(8)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(6));
-        $today = date('Y-m-d');
-        $createOk = mysqli_query($conn, "
-            INSERT INTO Conversation (idConversation, dateConversation, statutConversation, idAcheteur, idVendeur, idAnnonce)
-            VALUES ('$idConvNew', '$today', 'active', '$idUserSql', '$vendDestSql', '$annContSql')
+    /* VALIDATION 1 : Les deux paramètres doivent être présents */
+    if ($vendeurDest === '' || $annonceContexte === '') {
+        $erreurMsg = 'Lien invalide : vendeur ou annonce manquant.';
+    }
+    /* VALIDATION 2 : On ne peut pas se contacter soi-même */
+    elseif ($vendeurDest === $idUser) {
+        $erreurMsg = 'Vous ne pouvez pas vous envoyer un message à vous-même.';
+    }
+    else {
+        $vendDestSql = mysqli_real_escape_string($conn, $vendeurDest);
+        $annContSql = mysqli_real_escape_string($conn, $annonceContexte);
+
+        /* VALIDATION 3 : L'annonce existe et appartient bien à ce vendeur */
+        $rCheck = mysqli_query($conn, "
+            SELECT a.idAnnonce, a.idVendeur, a.statutAnnonce, u.idUtilisateur
+            FROM Annonce a
+            LEFT JOIN Utilisateur u ON u.idUtilisateur = a.idVendeur
+            WHERE a.idAnnonce = '$annContSql'
+            LIMIT 1
         ");
-        if ($createOk) {
-            $idConvActive = $idConvNew;
+        
+        if (!$rCheck || mysqli_num_rows($rCheck) === 0) {
+            $erreurMsg = 'Cette annonce n\'existe pas ou a été supprimée.';
+        } else {
+            $check = mysqli_fetch_assoc($rCheck);
+            
+            /* VALIDATION 4 : Le vendeur correspond bien au propriétaire de l'annonce */
+            if ($check['idVendeur'] !== $vendeurDest) {
+                $erreurMsg = 'Le vendeur ne correspond pas à cette annonce.';
+            }
+            /* VALIDATION 5 : Annonce toujours active */
+            elseif ($check['statutAnnonce'] !== 'active') {
+                $erreurMsg = 'Cette annonce n\'est plus active.';
+            }
+            else {
+                /* ✅ Tout est OK, on peut créer ou retrouver la conversation */
+                
+                /* Auto-créer Acheteur/Vendeur destinataire si absent */
+                mysqli_query($conn, "INSERT IGNORE INTO Acheteur (idUtilisateur) VALUES ('$vendDestSql')");
+                mysqli_query($conn, "INSERT IGNORE INTO Vendeur (idUtilisateur, typeVendeur, nbrAnnonceAct) VALUES ('$vendDestSql', 'particulier', 0)");
+
+                /* Vérifier si conversation existe déjà pour cette annonce avec ce vendeur */
+                $rExist = mysqli_query($conn, "
+                    SELECT idConversation 
+                    FROM Conversation 
+                    WHERE idAcheteur='$idUserSql' 
+                    AND idVendeur='$vendDestSql' 
+                    AND idAnnonce='$annContSql'
+                    LIMIT 1
+                ");
+                
+                if ($rExist && mysqli_num_rows($rExist) > 0) {
+                    $idConvActive = mysqli_fetch_assoc($rExist)['idConversation'];
+                } else {
+                    /* Créer nouvelle conversation */
+                    $idConvNew = bin2hex(random_bytes(8)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(2)) . '-' . bin2hex(random_bytes(6));
+                    $today = date('Y-m-d');
+                    $createOk = mysqli_query($conn, "
+                        INSERT INTO Conversation (idConversation, dateConversation, statutConversation, idAcheteur, idVendeur, idAnnonce)
+                        VALUES ('$idConvNew', '$today', 'active', '$idUserSql', '$vendDestSql', '$annContSql')
+                    ");
+                    if ($createOk) {
+                        $idConvActive = $idConvNew;
+                    } else {
+                        $erreurMsg = 'Erreur lors de la création de la conversation.';
+                    }
+                }
+                
+                /* Rediriger pour nettoyer l'URL */
+                if ($idConvActive && !$erreurMsg) {
+                    header("Location: messagerie.php?conv=" . urlencode($idConvActive));
+                    exit;
+                }
+            }
         }
     }
     
-    /* Rediriger pour nettoyer l'URL */
-    if ($idConvActive) {
-        header("Location: messagerie.php?conv=" . urlencode($idConvActive));
+    /* Si on est arrivé ici avec une erreur, on redirige vers messagerie.php sans paramètres */
+    if ($erreurMsg) {
+        header("Location: messagerie.php?err=" . urlencode($erreurMsg));
         exit;
     }
+}
+
+/* Récupérer message d'erreur depuis l'URL (après redirection) */
+if (isset($_GET['err'])) {
+    $erreurMsg = $_GET['err'];
 }
 
 /* ════════════════════════════════════════════════════════ */
@@ -200,6 +253,36 @@ function colorAvatar($id) {
       --r6: 6px; --r8: 8px; --r10: 10px;
     }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; background: var(--bg1); color: var(--t1); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* Bannière erreur */
+    .error-banner {
+      background: #FCEBEB;
+      color: #B71C1C;
+      border-bottom: 1px solid #E24B4A;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      animation: slideDown 0.3s ease;
+    }
+    .error-banner svg { color: #E24B4A; flex-shrink: 0; }
+    .error-banner span { flex: 1; }
+    .error-banner button {
+      background: none;
+      border: none;
+      color: #B71C1C;
+      font-size: 22px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+    }
+    .error-banner button:hover { color: #E24B4A; }
+    @keyframes slideDown {
+      from { transform: translateY(-100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
 
     /* NAVBAR */
     .nav { background: var(--bg0); border-bottom: 0.5px solid var(--bd); height: 52px; display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0; }
@@ -537,6 +620,14 @@ function colorAvatar($id) {
 </head>
 <body class="<?= $idConvActive ? 'chat-open' : '' ?>">
 
+  <?php if ($erreurMsg): ?>
+    <div class="error-banner" id="error-banner">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span><?= htmlspecialchars($erreurMsg) ?></span>
+      <button onclick="document.getElementById('error-banner').remove()">×</button>
+    </div>
+  <?php endif; ?>
+
   <!-- NAVBAR -->
   <nav class="nav">
     <a class="logo" href="index.php">
@@ -808,7 +899,7 @@ function colorAvatar($id) {
             appendMessage(json.message);
             scrollBottom();
           } else if (json.needLogin) {
-            location.href = 'connexion.php?redirect=messagerie.php';
+            location.href = 'inscription.php?redirect=messagerie.php';
           } else {
             alert(json.message || 'Erreur d\'envoi');
           }

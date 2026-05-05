@@ -30,6 +30,7 @@ $res = mysqli_query($conn, $sql);
 <head>
 <meta charset="UTF-8">
 <title>Admin - Signalements</title>
+<link rel="icon" href="images/logo.png">
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}

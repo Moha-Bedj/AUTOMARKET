@@ -41,6 +41,7 @@ $equipements = mysqli_query($conn, "
 <head>
 <meta charset="UTF-8">
 <title>Admin - Équipements</title>
+<link rel="icon" href="images/logo.png">
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}

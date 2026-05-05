@@ -56,6 +56,180 @@ if ($r) {
         }
     }
 }
+
+/* MODIF 1 : Compter messages non lus pour user connecté */
+$nbMessagesNonLus = 0;
+if (isset($_SESSION['idUtilisateur'])) {
+    $idU = mysqli_real_escape_string($conn, $_SESSION['idUtilisateur']);
+    $rMsg = mysqli_query($conn, "
+        SELECT COUNT(*) AS nb 
+        FROM Message m 
+        JOIN Conversation c ON m.idConversation = c.idConversation
+        WHERE (c.idAcheteur = '$idU' OR c.idVendeur = '$idU')
+        AND m.idUtilisateur != '$idU'
+        AND m.statutLecture = 0
+    ");
+    if ($rMsg) $nbMessagesNonLus = (int)(mysqli_fetch_assoc($rMsg)['nb'] ?? 0);
+}
+
+/* ════════════════════════════════════════════════════════════ */
+/* ═══   CALCUL TOP DEALS — score avancé (4 critères)        ═══ */
+/* ════════════════════════════════════════════════════════════ */
+/*
+ * Score = (Prix × 50%) + (Km × 25%) + (Année × 15%) + (État × 10%)
+ *
+ * - Prix     : compare au prix moyen du même modèle (±2 ans)
+ * - Km       : compare au km attendu (~15 000 km/an)
+ * - Année    : compare à l'année moyenne du segment
+ * - État     : neuf=+20, occasion=0, accidenté=-30
+ *
+ * Badges :
+ *   ≥ 25  → 🔥 SUPER DEAL  (rouge)
+ *   ≥ 15  → 🟢 TOP DEAL    (vert)
+ *   ≥ 5   → 🟡 BON PRIX    (orange)
+ *   < 5   → pas de badge   (non affiché dans Top Deals)
+ */
+
+$topDeals = [];
+$anneeActuelle = (int)date('Y');
+
+$sql_top = "
+    SELECT
+        a.idAnnonce, a.titre, a.prix, a.localisation, a.datePublication,
+        v.idVehicule, v.annee, v.kilometrage, v.carburant, v.transmission, 
+        v.puissance, v.etatVehicule,
+        mo.idModele, mo.nomModele,
+        ma.nomMarque,
+        (SELECT urlPhoto FROM Photos WHERE idAnnonce = a.idAnnonce ORDER BY ordrePhoto ASC LIMIT 1) AS photo_principale
+    FROM Annonce a
+    INNER JOIN Vehicule v  ON a.idVehicule = v.idVehicule
+    INNER JOIN Modele mo   ON v.idModele = mo.idModele
+    INNER JOIN Marque ma   ON mo.idMarque = ma.idMarque
+    WHERE a.statutAnnonce = 'active'
+      AND a.idVendeur != ''
+      AND a.idVendeur IS NOT NULL
+    LIMIT 50
+";
+$rTop = mysqli_query($conn, $sql_top);
+
+if ($rTop && mysqli_num_rows($rTop) > 0) {
+    while ($a = mysqli_fetch_assoc($rTop)) {
+        $idModele = $a['idModele'];
+        $annee = (int)$a['annee'];
+        $prix = (float)$a['prix'];
+        $km = (int)$a['kilometrage'];
+        $etat = strtolower($a['etatVehicule'] ?? 'occasion');
+        
+        if ($prix <= 0 || $annee < 1990) continue;
+        
+        /* ───── 1. SCORE PRIX (50%) ───── */
+        $idModeleSql = mysqli_real_escape_string($conn, $idModele);
+        $anneeMin = $annee - 2;
+        $anneeMax = $annee + 2;
+        $rPrixMoyen = mysqli_query($conn, "
+            SELECT AVG(a2.prix) AS prix_moyen, COUNT(*) AS nb
+            FROM Annonce a2
+            INNER JOIN Vehicule v2 ON a2.idVehicule = v2.idVehicule
+            WHERE v2.idModele = '$idModeleSql'
+              AND v2.annee BETWEEN $anneeMin AND $anneeMax
+              AND a2.statutAnnonce = 'active'
+              AND a2.idAnnonce != '" . mysqli_real_escape_string($conn, $a['idAnnonce']) . "'
+        ");
+        
+        $score_prix = 0;
+        $prix_moyen = 0;
+        $economie_pct = 0;
+        $hasReference = false;
+        
+        if ($rPrixMoyen) {
+            $prixData = mysqli_fetch_assoc($rPrixMoyen);
+            $nb_similaires = (int)($prixData['nb'] ?? 0);
+            
+            if ($nb_similaires >= 1 && $prixData['prix_moyen'] > 0) {
+                $prix_moyen = (float)$prixData['prix_moyen'];
+                $ecart = ($prix_moyen - $prix) / $prix_moyen;
+                $score_prix = $ecart * 100;
+                $economie_pct = round($ecart * 100);
+                $hasReference = true;
+            }
+        }
+        
+        /* ───── 2. SCORE KILOMÉTRAGE (25%) ───── */
+        $age = max(1, $anneeActuelle - $annee);
+        $km_attendu = $age * 15000;
+        $score_km = 0;
+        if ($km_attendu > 0) {
+            $ecart_km = ($km_attendu - $km) / $km_attendu;
+            $score_km = max(-50, min(50, $ecart_km * 100));
+        }
+        
+        /* ───── 3. SCORE ANNÉE (15%) ───── */
+        $rAnneeMoyenne = mysqli_query($conn, "
+            SELECT AVG(v3.annee) AS annee_moy
+            FROM Annonce a3
+            INNER JOIN Vehicule v3 ON a3.idVehicule = v3.idVehicule
+            WHERE v3.idModele = '$idModeleSql'
+              AND a3.statutAnnonce = 'active'
+        ");
+        $score_annee = 0;
+        if ($rAnneeMoyenne) {
+            $anneeData = mysqli_fetch_assoc($rAnneeMoyenne);
+            if ($anneeData['annee_moy']) {
+                $score_annee = ($annee - $anneeData['annee_moy']) * 5;
+            }
+        }
+        
+        /* ───── 4. SCORE ÉTAT (10%) ───── */
+        $score_etat = 0;
+        if ($etat === 'neuf') $score_etat = 20;
+        elseif ($etat === 'accidente' || $etat === 'accidenté') $score_etat = -30;
+        
+        /* ───── SCORE FINAL pondéré ───── */
+        $score_final = ($score_prix * 0.50) 
+                     + ($score_km * 0.25) 
+                     + ($score_annee * 0.15) 
+                     + ($score_etat * 0.10);
+        
+        /* Si pas de référence prix, on met un score plus modeste basé uniquement sur km/année/état */
+        if (!$hasReference) {
+            $score_final = ($score_km * 0.50) + ($score_annee * 0.30) + ($score_etat * 0.20);
+            $economie_pct = 0;
+        }
+        
+        /* Déterminer le badge */
+        $badge_label = '';
+        $badge_class = '';
+        if ($score_final >= 25) {
+            $badge_label = 'SUPER DEAL';
+            $badge_class = 'super';
+        } elseif ($score_final >= 15) {
+            $badge_label = 'TOP DEAL';
+            $badge_class = 'top';
+        } elseif ($score_final >= 5) {
+            $badge_label = 'BON PRIX';
+            $badge_class = 'good';
+        } else {
+            continue; /* On ignore les annonces sans bon score */
+        }
+        
+        $a['score'] = $score_final;
+        $a['badge_label'] = $badge_label;
+        $a['badge_class'] = $badge_class;
+        $a['economie_pct'] = $economie_pct;
+        $a['prix_moyen'] = $prix_moyen;
+        $a['hasReference'] = $hasReference;
+        
+        $topDeals[] = $a;
+    }
+    
+    /* Trier par score décroissant */
+    usort($topDeals, function($x, $y) {
+        return $y['score'] <=> $x['score'];
+    });
+    
+    /* Garder le top 10 */
+    $topDeals = array_slice($topDeals, 0, 10);
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -211,7 +385,40 @@ body {
   color: var(--blue); 
 }
 
-/* HERO */
+/* MODIF 2 : Badge messages */
+.nav-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.2;
+  border: 2px solid var(--bg0);
+}
+
+.dropdown-item-badge {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dropdown-badge {
+  background: var(--red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 10px;
+  line-height: 1.2;
+  margin-left: 8px;
+}
+
 /* HERO */
 .hero {
   background:
@@ -242,7 +449,6 @@ body {
   line-height: 1.3;
 }
 
-/* ═══ AI SEARCH BAR EXACTEMENT STYLE MOBILE.DE ═══ */
 .ai-search-overlap {
   position: absolute;
   left: 50%;
@@ -340,7 +546,6 @@ body {
   background: var(--blue-dk);
 }
 
-/* TON ANCIEN BLOC FILTRE */
 .search-wrap {
   display: flex;
     width: min(1200px, calc(100% - 48px));
@@ -435,7 +640,7 @@ body {
   background: #fff;
   border-radius: 0 var(--r10) var(--r10) 0;
   box-shadow: 0 18px 45px rgba(0,0,0,0.22);
-  padding: 42px 20px 14px; /* ← plus de padding-top pour éviter que la barre IA chevauche le contenu */
+  padding: 42px 20px 14px;
 }
 
 .search-tabs {
@@ -664,7 +869,6 @@ body {
   color: var(--blue); 
 }
 
-/* BODY */
 .body-wrap {
   max-width: 1100px;
   margin: 0 auto;
@@ -675,7 +879,6 @@ body {
   display: none; 
 }
 
-/* SELL BANNER */
 .sell-banner {
   background: var(--blue);
   border-radius: var(--r10);
@@ -793,14 +996,12 @@ body {
   color: var(--t1); 
 }
 
-/* LISTINGS */
 .listings { 
   display: flex; 
   flex-direction: column; 
   gap: 10px; 
 }
 
-/* ═══ TOP DEALS HOLDER STYLE MOBILE.DE ═══ */
 .top-deals {
   width: min(1200px, calc(100% - 48px));
   margin: 40px auto;
@@ -981,18 +1182,10 @@ body {
   transform: scale(1.08);
 }
 
-.deal-fav.faved {
-  color: var(--red);
-}
+.deal-fav.faved { color: var(--red); }
+.deal-fav.faved svg { fill: var(--red); stroke: var(--red); }
 
-.deal-fav.faved svg {
-  fill: var(--red);
-  stroke: var(--red);
-}
-
-.deal-body {
-  padding: 14px 16px 16px;
-}
+.deal-body { padding: 14px 16px 16px; }
 
 .deal-title {
   font-size: 15px;
@@ -1004,7 +1197,6 @@ body {
   text-overflow: ellipsis;
 }
 
-
 .deal-price {
   display: flex;
   align-items: baseline;
@@ -1012,34 +1204,16 @@ body {
   margin-bottom: 4px;
 }
 
-.deal-price-val {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--t1);
-}
-
-.deal-price-unit {
-  font-size: 13px;
-  color: var(--t2);
-  font-weight: 500;
-}
-
-.deal-year {
-  font-size: 12px;
-  color: var(--t2);
-  margin-bottom: 10px;
-}
-
-.deal-badge-row {
-  margin-bottom: 10px;
-}
+.deal-price-val { font-size: 20px; font-weight: 700; color: var(--t1); }
+.deal-price-unit { font-size: 13px; color: var(--t2); font-weight: 500; }
+.deal-year { font-size: 12px; color: var(--t2); margin-bottom: 10px; }
+.deal-badge-row { margin-bottom: 10px; }
 
 .deal-badge-tag {
-  background: #FFA366;
   color: #fff;
   font-size: 11px;
   font-weight: 700;
-  padding: 3px 10px;
+  padding: 4px 11px;
   border-radius: 12px;
   display: inline-flex;
   align-items: center;
@@ -1047,12 +1221,53 @@ body {
   letter-spacing: 0.3px;
 }
 
-.deal-badge-tag::before {
-  content: '';
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #fff;
+/* 🔥 SUPER DEAL — rouge dégradé */
+.deal-badge-super {
+  background: linear-gradient(135deg, #FF4D4D, #E24B4A);
+  box-shadow: 0 2px 6px rgba(226,75,74,0.35);
+}
+
+/* ✓ TOP DEAL — vert */
+.deal-badge-top {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 2px 6px rgba(22,163,74,0.30);
+}
+
+/* ★ BON PRIX — orange */
+.deal-badge-good {
+  background: linear-gradient(135deg, #FFA366, #FF8A4C);
+  box-shadow: 0 2px 6px rgba(255,138,76,0.30);
+}
+
+/* ✨ NOUVEAU — bleu (fallback) */
+.deal-badge-new {
+  background: linear-gradient(135deg, #185FA5, #0C447C);
+  box-shadow: 0 2px 6px rgba(24,95,165,0.30);
+}
+
+/* Badge d'économie (en haut à gauche de l'image) */
+.deal-savings-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: linear-gradient(135deg, #FF4D4D, #E24B4A);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 5px 11px;
+  border-radius: 8px;
+  z-index: 2;
+  box-shadow: 0 4px 12px rgba(226,75,74,0.40);
+  letter-spacing: 0.3px;
+}
+
+/* Prix moyen marché barré */
+.deal-price-avg {
+  font-size: 11px;
+  color: var(--t3);
+  text-decoration: line-through;
+  margin-bottom: 4px;
+  margin-top: -2px;
 }
 
 .deal-chips {
@@ -1075,10 +1290,7 @@ body {
   white-space: nowrap;
 }
 
-.deal-chip-full {
-  display: inline-flex;
-  margin-bottom: 10px;
-}
+.deal-chip-full { display: inline-flex; margin-bottom: 10px; }
 
 .deal-location {
   display: flex;
@@ -1090,7 +1302,6 @@ body {
   border-top: 0.5px solid var(--bd);
 }
 
-/* LISTING CARD */
 .lcard {
   background: var(--bg0);
   border: 0.5px solid var(--bd);
@@ -1170,16 +1381,9 @@ body {
   align-items: center;
 }
 
+.hidden { display: none; }
 
-
-.hidden {
-  display: none;
-}
-
-.lspec { 
-  font-size: 12px; 
-  color: var(--t2); 
-}
+.lspec { font-size: 12px; color: var(--t2); }
 
 .lspec-dot {
   width: 3px; 
@@ -1215,12 +1419,8 @@ body {
   border: 0.5px solid var(--blue-bd);
 }
 
-.ldate { 
-  font-size: 11px; 
-  color: var(--t3); 
-}
+.ldate { font-size: 11px; color: var(--t3); }
 
-/* FOOTER */
 .footer {
   background: var(--bg0);
   border-top: 0.5px solid var(--bd);
@@ -1231,16 +1431,9 @@ body {
   margin-top: 40px;
 }
 
-.footer a { 
-  color: var(--blue); 
-  text-decoration: none; 
-}
+.footer a { color: var(--blue); text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
 
-.footer a:hover { 
-  text-decoration: underline; 
-}
-
-/* USER MENU */
 .user-menu {
   display: flex;
   align-items: center;
@@ -1252,9 +1445,7 @@ body {
   transition: background .15s;
 }
 
-.user-menu:hover { 
-  background: var(--bg1); 
-}
+.user-menu:hover { background: var(--bg1); }
 
 .user-avatar {
   width: 32px;
@@ -1275,10 +1466,7 @@ body {
   border: none;
 }
 
-.user-name {
-  font-size: 13px;
-  font-weight: 500;
-}
+.user-name { font-size: 13px; font-weight: 500; }
 
 .dropdown {
   position: absolute;
@@ -1288,7 +1476,7 @@ body {
   border: 0.5px solid var(--bd);
   border-radius: 8px;
   padding: 6px 0;
-  min-width: 160px;
+  min-width: 180px;
   z-index: 200;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
@@ -1302,9 +1490,7 @@ body {
   transition: background .15s;
 }
 
-.dropdown-item:hover { 
-  background: var(--bg1); 
-}
+.dropdown-item:hover { background: var(--bg1); }
 
 .publish-success {
   background: var(--green);
@@ -1322,14 +1508,8 @@ body {
 }
 
 @keyframes slideDown {
-  from { 
-    opacity: 0; 
-    transform: translateY(-100%); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
-  }
+  from { opacity: 0; transform: translateY(-100%); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 #ai-search-input::placeholder {
@@ -1347,12 +1527,8 @@ body {
 }
 
 @keyframes blinkCursor {
-  0%, 45% {
-    opacity: 1;
-  }
-  46%, 100% {
-    opacity: 0;
-  }
+  0%, 45% { opacity: 1; }
+  46%, 100% { opacity: 0; }
 }
 
 .ai-search-box:hover .typing-cursor,
@@ -1360,234 +1536,61 @@ body {
   color: var(--t2);
 }
 
-/* RESPONSIVE */
 @media (max-width: 900px) {
   .top-deals {
     width: calc(100% - 24px);
     padding: 22px 18px;
     border-radius: 16px;
   }
-
-  .deal-card {
-    flex: 0 0 250px;
-    width: 250px;
-  }
-
-  .deal-img {
-    height: 160px;
-  }
-
-  .deals-nav {
-    display: none;
-  }
+  .deal-card { flex: 0 0 250px; width: 250px; }
+  .deal-img { height: 160px; }
+  .deals-nav { display: none; }
 }
 
 @media (max-width: 600px) {
-  #logo-id { 
-    display: none; 
-  }
-
-  .nav-search { 
-    display: none; 
-  }
-
-  .nav-fav { 
-    display: none; 
-  }
-
-  .nav { 
-    padding: 0 16px; 
-    justify-content: space-between; 
-  }
-
-  .hero { 
-    background: #fff; 
-    padding: 20px 16px 0; 
-    text-align: left; 
-  }
-
-  .hero-title { 
-    color: #1a1a18; 
-    font-size: 24px; 
-    font-weight: 500; 
-    margin-bottom: 16px; 
-  }
-
-  .hero-sub { 
-    display: none; 
-  }
-
-  /* Mobile : AI search normale, pas de chevauchement */
-  .ai-search-overlap {
-    margin-top: 0;
-    margin-bottom: 14px;
-    padding: 0;
-  }
-  .ai-search {
-    padding: 10px;
-  }
-  .ai-search-box input {
-    font-size: 14px;
-    height: 40px;
-  }
-  .ai-search-btn {
-    width: 38px;
-    height: 38px;
-  }
-
-  .search-wrap {
-    flex-direction: column; 
-    max-width: 100%;
-    border: 0.5px solid var(--blue-dk); 
-    border-radius: var(--r10);
-  }
-
-  .search-box { 
-    border-radius: 8px; 
-    padding: 0; 
-    background: transparent; 
-  }
-
-  .search-tabs { 
-    display: none; 
-  }
-
-  .sf-grid-row2 > div:last-child { 
-    display: none; 
-  }
-
-  .hero-search {
-    display: none; /* désactivé car remplacé par ai-search */
-  }
-
-  .vtype-sidebar {
-    flex-direction: row;
-    width: 100%;
-    border-radius: var(--r10) var(--r10) 0 0;
-    padding: 8px 0 0;
-    background: var(--blue-dk);
-    gap: 0;
-  }
-
-  .vtype-icon-btn {
-    flex: 1;
-    height: 56px;
-    border-radius: 0;
-    background: transparent;
-    color: rgba(255,255,255,.5);
-    border-bottom: 2.5px solid transparent;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .vtype-icon-btn.active {
-    color: #fff;
-    background: rgba(255,255,255,.15);
-    border-bottom-color: #185FA5;
-  }
-
-  .vtype-icon-btn.active::before { 
-    display: none; 
-  }
-
-  .vtype-label { 
-    font-size: 10px; 
-  }
-
-  .vtype-svg { 
-    width: 22px; 
-    height: 22px; 
-  }
-
-  .search-box { 
-    padding: 14px 16px; 
-  }
-
-  .sf-grid-row1 { 
-    grid-template-columns: 1fr 1fr; 
-  }
-
-  .sf-grid-row2 { 
-    grid-template-columns: 1fr 1fr; 
-  }
-
-  .sf-elec-row { 
-    margin-bottom: 10px; 
-  }
-
-  .btn-search {
-    width: 100%;
-    height: 48px;
-    font-size: 15px;
-    border-radius: 10px;
-    margin-top: 6px;
-  }
-
-  #col-paiement { 
-    display: none; 
-  }
-
-  .body-wrap { 
-    padding: 10px 10px 32px; 
-  }
-
-  .lcard { 
-    flex-direction: column; 
-  }
-
-  .lcard-img { 
-    width: 100%; 
-    height: 190px; 
-  }
-
-  .sell-banner { 
-    flex-direction: column; 
-    text-align: center; 
-  }
-
-  .results-head { 
-    flex-direction: column; 
-    gap: 8px; 
-  }
-
-  .top-deals {
-    width: calc(100% - 20px);
-    margin: 24px auto;
-    padding: 18px 14px;
-  }
-
-  .deals-head {
-    margin-bottom: 16px;
-  }
-
-  .deals-title {
-    font-size: 19px;
-  }
-
-  .deals-badge {
-    font-size: 12px;
-    padding: 4px 10px;
-  }
-
-  .deals-view-all {
-    font-size: 13px;
-  }
-
-  .deals-scroll {
-    gap: 14px;
-  }
-
-  .deal-card {
-    flex: 0 0 245px;
-    width: 245px;
-  }
-
-  .deal-img {
-    height: 155px;
-  }
+  #logo-id { display: none; }
+  .nav-search { display: none; }
+  .nav-fav { display: none; }
+  .nav { padding: 0 16px; justify-content: space-between; }
+  .hero { background: #fff; padding: 20px 16px 0; text-align: left; }
+  .hero-title { color: #1a1a18; font-size: 24px; font-weight: 500; margin-bottom: 16px; }
+  .hero-sub { display: none; }
+  .ai-search-overlap { margin-top: 0; margin-bottom: 14px; padding: 0; }
+  .ai-search { padding: 10px; }
+  .ai-search-box input { font-size: 14px; height: 40px; }
+  .ai-search-btn { width: 38px; height: 38px; }
+  .search-wrap { flex-direction: column; max-width: 100%; border: 0.5px solid var(--blue-dk); border-radius: var(--r10); }
+  .search-box { border-radius: 8px; padding: 0; background: transparent; }
+  .search-tabs { display: none; }
+  .sf-grid-row2 > div:last-child { display: none; }
+  .hero-search { display: none; }
+  .vtype-sidebar { flex-direction: row; width: 100%; border-radius: var(--r10) var(--r10) 0 0; padding: 8px 0 0; background: var(--blue-dk); gap: 0; }
+  .vtype-icon-btn { flex: 1; height: 56px; border-radius: 0; background: transparent; color: rgba(255,255,255,.5); border-bottom: 2.5px solid transparent; flex-direction: column; gap: 3px; }
+  .vtype-icon-btn.active { color: #fff; background: rgba(255,255,255,.15); border-bottom-color: #185FA5; }
+  .vtype-icon-btn.active::before { display: none; }
+  .vtype-label { font-size: 10px; }
+  .vtype-svg { width: 22px; height: 22px; }
+  .search-box { padding: 14px 16px; }
+  .sf-grid-row1 { grid-template-columns: 1fr 1fr; }
+  .sf-grid-row2 { grid-template-columns: 1fr 1fr; }
+  .sf-elec-row { margin-bottom: 10px; }
+  .btn-search { width: 100%; height: 48px; font-size: 15px; border-radius: 10px; margin-top: 6px; }
+  #col-paiement { display: none; }
+  .body-wrap { padding: 10px 10px 32px; }
+  .lcard { flex-direction: column; }
+  .lcard-img { width: 100%; height: 190px; }
+  .sell-banner { flex-direction: column; text-align: center; }
+  .results-head { flex-direction: column; gap: 8px; }
+  .top-deals { width: calc(100% - 20px); margin: 24px auto; padding: 18px 14px; }
+  .deals-head { margin-bottom: 16px; }
+  .deals-title { font-size: 19px; }
+  .deals-badge { font-size: 12px; padding: 4px 10px; }
+  .deals-view-all { font-size: 13px; }
+  .deals-scroll { gap: 14px; }
+  .deal-card { flex: 0 0 245px; width: 245px; }
+  .deal-img { height: 155px; }
 }
   </style>
-  
 </head>
 <body>
 
@@ -1599,11 +1602,24 @@ body {
     </a>
 
     <div class="nav-links">
-      <div class="nav-fav" title="Notifications">
-        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M19 12.59V10c0-3.22-2.18-5.93-5.14-6.74C13.57 2.52 12.85 2 12 2s-1.56.52-1.86 1.26C7.18 4.08 5 6.79 5 10v2.59L3.29 14.3a1 1 0 0 0-.29.71v2c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-2c0-.27-.11-.52-.29-.71zM19 16H5v-.59l1.71-1.71a1 1 0 0 0 .29-.71v-3c0-2.76 2.24-5 5-5s5 2.24 5 5v3c0 .27.11.52.29.71L19 15.41zm-4.18 4H9.18c.41 1.17 1.51 2 2.82 2s2.41-.83 2.82-2"/>
-        </svg>
-      </div>
+
+      <!-- MODIF 3 : cloche → lien messagerie + badge -->
+      <?php if (isset($_SESSION['idUtilisateur'])): ?>
+        <a class="nav-fav" href="messagerie.php" title="Messages">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <?php if ($nbMessagesNonLus > 0): ?>
+            <span class="nav-badge"><?= $nbMessagesNonLus > 9 ? '9+' : $nbMessagesNonLus ?></span>
+          <?php endif; ?>
+        </a>
+      <?php else: ?>
+        <div class="nav-fav" title="Notifications">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M19 12.59V10c0-3.22-2.18-5.93-5.14-6.74C13.57 2.52 12.85 2 12 2s-1.56.52-1.86 1.26C7.18 4.08 5 6.79 5 10v2.59L3.29 14.3a1 1 0 0 0-.29.71v2c0 .55.45 1 1 1h16c.55 0 1-.45 1-1v-2c0-.27-.11-.52-.29-.71zM19 16H5v-.59l1.71-1.71a1 1 0 0 0 .29-.71v-3c0-2.76 2.24-5 5-5s5 2.24 5 5v3c0 .27.11.52.29.71L19 15.41zm-4.18 4H9.18c.41 1.17 1.51 2 2.82 2s2.41-.83 2.82-2"/>
+          </svg>
+        </div>
+      <?php endif; ?>
 
       <?php if (isset($_SESSION['idUtilisateur'])): ?>
         <a class="nav-fav" href="favoris.php" title="Mes favoris">
@@ -1629,25 +1645,33 @@ body {
           <span class="user-name"><?= htmlspecialchars($_SESSION['prenom']) ?></span>
         </div>
 
+        <!-- MODIF 4 : Messages dans dropdown avec badge -->
         <div id="user-dropdown" class="dropdown" style="display:none">
           <a href="monprofil.php" class="dropdown-item">Mon profil</a>
-<a href="mesannonces.php" class="dropdown-item">Mes annonces</a>
-<a href="favoris.php" class="dropdown-item">Mes favoris</a>
+          <a href="mesannonces.php" class="dropdown-item">Mes annonces</a>
+          <a href="messagerie.php" class="dropdown-item dropdown-item-badge">
+            <span>Messages</span>
+            <?php if ($nbMessagesNonLus > 0): ?>
+              <span class="dropdown-badge"><?= $nbMessagesNonLus > 9 ? '9+' : $nbMessagesNonLus ?></span>
+            <?php endif; ?>
+          </a>
+          <a href="favoris.php" class="dropdown-item">Mes favoris</a>
 
-<?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
-  <a href="admin_dashboard.php" class="dropdown-item" style="color:var(--blue);font-weight:600">
-    Dashboard admin
-  </a>
-<?php endif; ?>
+          <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
+            <a href="admin_dashboard.php" class="dropdown-item" style="color:var(--blue);font-weight:600">
+              Dashboard admin
+            </a>
+          <?php endif; ?>
 
-<hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
-<a href="deconnexion.php" class="dropdown-item" style="color:var(--red)">Se déconnecter</a>
+          <hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
+          <a href="deconnexion.php" class="dropdown-item" style="color:var(--red)">Se déconnecter</a>
         </div>
-        <?php else: ?>
+      <?php else: ?>
         <button class="nav-btn btn-fill" onclick="location.href='inscription.php'">Connexion</button>
       <?php endif; ?>
     </div>
   </nav>
+
   <?php if ($publie): ?>
     <div class="publish-success">
       <div class="publish-success-inner">
@@ -1663,13 +1687,10 @@ body {
     </div>
   <?php endif; ?>
 
-  <!-- HERO -->
-  <!-- HERO -->
 <section class="hero">
   <h1 class="hero-title">Trouvez votre prochain véhicule en Algérie</h1>
   <p class="hero-sub" id="hero-sub">Marketplace automobile algérienne</p>
 
-  <!-- BARRE IA STYLE MOBILE.DE -->
   <div class="ai-search-overlap">
     <div class="ai-search">
       <h2 class="ai-search-title">Millions des vehicules. Une simple recherche</h2>
@@ -1692,7 +1713,6 @@ body {
   </div>
 </section>
 
-  <!-- SEARCH WRAP -->
   <div class="search-wrap">
     <div class="vtype-sidebar">
       <button class="vtype-icon-btn active" id="vt-voiture" onclick="setVType('voiture')" title="Voiture">
@@ -1800,7 +1820,7 @@ body {
           </div>
         </div>
         <div style="display:flex;align-items:flex-end">
-          <button class="btn-search" id="btn-search">
+          <button class="btn-search" id="btn-search" onclick="goToRecherche()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
@@ -1830,8 +1850,7 @@ body {
     </div>
   </div>
 
-
-  <!-- ══ TOP DEALS CARROUSEL ══ -->
+<?php if (count($topDeals) > 0): ?>
 <section class="top-deals">
   <div class="deals-wrap">
     
@@ -1839,7 +1858,7 @@ body {
       <h2 class="deals-title">
         Top <span class="deals-badge">DEALS</span> pour vous
       </h2>
-      <a href="recherche.php" class="deals-view-all">Tout afficher →</a>
+      <a href="recherche.php?tri=top_deals" class="deals-view-all">Tout afficher →</a>
     </div>
 
     <div class="deals-carousel-wrap">
@@ -1851,21 +1870,7 @@ body {
 
       <div class="deals-scroll" id="deals-scroll">
         <?php
-        $sql_deals = "
-            SELECT
-                a.idAnnonce, a.titre, a.prix, a.localisation, a.datePublication,
-                v.annee, v.kilometrage, v.carburant, v.transmission, v.puissance,
-                (SELECT urlPhoto FROM Photos WHERE idAnnonce = a.idAnnonce ORDER BY ordrePhoto ASC LIMIT 1) AS photo_principale
-            FROM Annonce a, Vehicule v
-            WHERE a.idVehicule = v.idVehicule
-            AND a.statutAnnonce = 'active'
-            ORDER BY a.datePublication DESC
-            LIMIT 10
-        ";
-        $res_deals = mysqli_query($conn, $sql_deals);
-
-        if ($res_deals && mysqli_num_rows($res_deals) > 0) {
-            while ($d = mysqli_fetch_assoc($res_deals)) {
+        foreach ($topDeals as $d) {
                 $titre = htmlspecialchars($d['titre']);
                 $prix  = number_format($d['prix'], 0, ',', ' ');
                 $loc   = htmlspecialchars($d['localisation']);
@@ -1876,6 +1881,11 @@ body {
                 $puiss = $d['puissance'];
                 $idAnn = $d['idAnnonce'];
                 $photoD = $d['photo_principale'] ?? null;
+                $badgeLabel = $d['badge_label'];
+                $badgeClass = $d['badge_class'];
+                $economie = $d['economie_pct'];
+                $hasRef = $d['hasReference'];
+                $prixMoyen = $hasRef && isset($d['prix_moyen']) ? number_format($d['prix_moyen'], 0, ',', ' ') : '';
         ?>
         <div class="deal-card" onclick="location.href='ficheAnnonces.php?id=<?= $idAnn ?>'">
           <div class="deal-img" <?= $photoD ? 'style="background-image:url(\''.htmlspecialchars($photoD).'\');background-size:cover;background-position:center"' : '' ?>>
@@ -1884,6 +1894,11 @@ body {
                 <path d="M11.29 20.66c.2.2.45.29.71.29s.51-.1.71-.29l7.5-7.5c2.35-2.35 2.35-6.05 0-8.41-2.3-2.28-5.85-2.35-8.21-.2-2.36-2.15-5.91-2.09-8.21.2-2.35 2.36-2.35 6.06 0 8.41z"/>
               </svg>
             </button>
+
+            <?php if ($hasRef && $economie >= 5): ?>
+              <div class="deal-savings-badge">−<?= $economie ?>%</div>
+            <?php endif; ?>
+
             <?php if (!$photoD): ?>
             <svg class="deal-placeholder" width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.8">
               <rect x="1" y="6" width="22" height="13" rx="3"/>
@@ -1899,10 +1914,16 @@ body {
               <span class="deal-price-val"><?= $prix ?></span>
               <span class="deal-price-unit">DA</span>
             </div>
+            <?php if ($hasRef && $economie >= 5): ?>
+              <div class="deal-price-avg">≈ Moyenne marché : <?= $prixMoyen ?> DA</div>
+            <?php endif; ?>
             <div class="deal-year"><?= $annee ?> · <?= $km ?> km</div>
 
             <div class="deal-badge-row">
-              <span class="deal-badge-tag">DEAL</span>
+              <span class="deal-badge-tag deal-badge-<?= $badgeClass ?>">
+                <?php if ($badgeClass === 'super'): ?>🔥 <?php elseif ($badgeClass === 'top'): ?>✓ <?php elseif ($badgeClass === 'good'): ?>★ <?php elseif ($badgeClass === 'new'): ?>✨ <?php endif; ?>
+                <?= $badgeLabel ?>
+              </span>
             </div>
 
             <div class="deal-chips">
@@ -1939,7 +1960,7 @@ body {
             </div>
           </div>
         </div>
-        <?php }} ?>
+        <?php } ?>
       </div>
 
       <button class="deals-nav deals-nav-right" onclick="scrollDeals(3)" aria-label="Suivant">
@@ -1950,8 +1971,8 @@ body {
     </div>
   </div>
 </section>
+<?php endif; ?>
 
-  <!-- BODY -->
   <div class="body-wrap">
     <main>
       <div class="sell-banner">
@@ -2103,97 +2124,60 @@ body {
 
   <script>
     const MARQUES_DB = <?= json_encode($marquesDB, JSON_UNESCAPED_UNICODE); ?>;
-   function buildAdvMarques() {
 
-  const list = document.getElementById('adv-marques-list');
+    function buildAdvMarques() {
+      const list = document.getElementById('adv-marques-list');
+      if (!list) return;
+      list.innerHTML = '';
+      Object.keys(MARQUES_DB).forEach(marque => {
+        const opt = document.createElement('option');
+        opt.value = marque;
+        list.appendChild(opt);
+      });
+    }
+    window.addEventListener('load', buildAdvMarques);
 
-  if (!list) return;
+    function updateAdvModeles() {
+      const marqueInput = document.getElementById('adv-marque');
+      const modeleInput = document.getElementById('adv-modele');
+      const versionInput = document.getElementById('adv-version');
+      const modelesList = document.getElementById('adv-modeles-list');
+      const versionsList = document.getElementById('adv-versions-list');
+      if (!marqueInput || !modeleInput || !versionInput || !modelesList || !versionsList) return;
+      const marque = marqueInput.value.trim();
+      modeleInput.value = '';
+      versionInput.value = '';
+      modelesList.innerHTML = '';
+      versionsList.innerHTML = '';
+      const modeles = MARQUES_DB[marque];
+      if (!modeles) return;
+      Object.keys(modeles).forEach(modele => {
+        const opt = document.createElement('option');
+        opt.value = modele;
+        modelesList.appendChild(opt);
+      });
+    }
 
-  list.innerHTML = '';
+    function updateAdvVersions() {
+      const marque = document.getElementById('adv-marque').value.trim();
+      const modele = document.getElementById('adv-modele').value.trim();
+      const versionInput = document.getElementById('adv-version');
+      const versionsList = document.getElementById('adv-versions-list');
+      if (!versionInput || !versionsList) return;
+      versionInput.value = '';
+      versionsList.innerHTML = '';
+      const versions = MARQUES_DB[marque]?.[modele];
+      if (!versions) return;
+      versions.forEach(version => {
+        const opt = document.createElement('option');
+        opt.value = version;
+        versionsList.appendChild(opt);
+      });
+    }
 
-  Object.keys(MARQUES_DB).forEach(marque => {
-
-    const opt = document.createElement('option');
-
-    opt.value = marque;
-
-    list.appendChild(opt);
-
-  });
-}
-window.addEventListener('load', buildAdvMarques);
-function updateAdvModeles() {
-
-  const marqueInput = document.getElementById('adv-marque');
-
-  const modeleInput = document.getElementById('adv-modele');
-
-  const versionInput = document.getElementById('adv-version');
-
-  const modelesList = document.getElementById('adv-modeles-list');
-
-  const versionsList = document.getElementById('adv-versions-list');
-
-  if (!marqueInput || !modeleInput || !versionInput || !modelesList || !versionsList) return;
-
-  const marque = marqueInput.value.trim();
-
-  modeleInput.value = '';
-
-  versionInput.value = '';
-
-  modelesList.innerHTML = '';
-
-  versionsList.innerHTML = '';
-
-  const modeles = MARQUES_DB[marque];
-
-  if (!modeles) return;
-
-  Object.keys(modeles).forEach(modele => {
-
-    const opt = document.createElement('option');
-
-    opt.value = modele;
-
-    modelesList.appendChild(opt);
-
-  });
-}
-function updateAdvVersions() {
-
-  const marque = document.getElementById('adv-marque').value.trim();
-
-  const modele = document.getElementById('adv-modele').value.trim();
-
-  const versionInput = document.getElementById('adv-version');
-
-  const versionsList = document.getElementById('adv-versions-list');
-
-  if (!versionInput || !versionsList) return;
-
-  versionInput.value = '';
-
-  versionsList.innerHTML = '';
-
-  const versions = MARQUES_DB[marque]?.[modele];
-
-  if (!versions) return;
-
-  versions.forEach(version => {
-
-    const opt = document.createElement('option');
-
-    opt.value = version;
-
-    versionsList.appendChild(opt);
-
-  });
-
-}
     const DATA = {
       voiture: {
-        marques:MARQUES_DB,
+        marques: MARQUES_DB,
         labels: { marque:'Marque', modele:'Modèle', km:'Kilomètres jusqu\'à', prix:'Prix jusqu\'à' },
         count: '<?= $counts_type["voiture"] ?> annonces',
         subtitle: 'Marketplace voitures — Algérie',
@@ -2282,23 +2266,21 @@ function updateAdvVersions() {
       document.getElementById('sel-modele').innerHTML = '<option value="">Quelconque</option>';
     }
 
-  function updateModels() {
-  const marque = document.getElementById('sel-marque').value;
-  const sel = document.getElementById('sel-modele');
+    function updateModels() {
+      const marque = document.getElementById('sel-marque').value;
+      const sel = document.getElementById('sel-modele');
+      sel.innerHTML = '<option value="">Quelconque</option>';
+      const modeles = DATA[currentVType].marques[marque];
+      if (modeles) {
+        Object.keys(modeles).forEach(modele => {
+          const o = document.createElement('option');
+          o.value = modele;
+          o.textContent = modele;
+          sel.appendChild(o);
+        });
+      }
+    }
 
-  sel.innerHTML = '<option value="">Quelconque</option>';
-
-  const modeles = DATA[currentVType].marques[marque];
-
-  if (modeles) {
-    Object.keys(modeles).forEach(modele => {
-      const o = document.createElement('option');
-      o.value = modele;
-      o.textContent = modele;
-      sel.appendChild(o);
-    });
-  }
-}
     function setSTab(t) {
       ['buy','rent'].forEach(id => {
         document.getElementById('st-' + id).classList.toggle('active', id === t);
@@ -2313,37 +2295,57 @@ function updateAdvVersions() {
     function toggleElec() {
       document.getElementById('chk-elec').classList.toggle('on');
     }
-function updateModels() {
-  const marque = document.getElementById('sel-marque').value;
-  const sel = document.getElementById('sel-modele');
 
-  sel.innerHTML = '<option value="">Quelconque</option>';
-
-  const modeles = DATA[currentVType].marques[marque];
-
-  if (modeles) {
-    Object.keys(modeles).forEach(modele => {
-      const o = document.createElement('option');
-      o.value = modele;
-      o.textContent = modele;
-      sel.appendChild(o);
-    });
-  }
-}
     function doAISearch() {
       const q = document.getElementById('ai-search-input').value.trim();
-      if (q) alert('Recherche IA : ' + q);
+      if (q) location.href = 'recherche.php?q=' + encodeURIComponent(q);
     }
- function openAdvancedFilters() {
-  document.getElementById('advancedFilters').classList.add('show');
-  document.body.style.overflow = 'hidden';
-  buildAdvMarques();
-}
 
-function closeAdvancedFilters() {
-  document.getElementById('advancedFilters').classList.remove('show');
-  document.body.style.overflow = '';
-}
+    /* Bouton Rechercher → recherche.php avec filtres */
+    function goToRecherche() {
+      const params = new URLSearchParams();
+      const marque = document.getElementById('sel-marque').value;
+      const modele = document.getElementById('sel-modele').value;
+      const annee = document.getElementById('sel-annee').value;
+      const km = document.getElementById('sel-km').value;
+      const prix = document.getElementById('sel-prix').value;
+      const wilaya = document.getElementById('inp-wilaya').value;
+
+      if (currentVType) params.set('type', currentVType);
+      if (marque) params.set('marque', marque);
+      if (modele) params.set('modele', modele);
+      if (annee) params.set('annee_min', annee.replace(/[^0-9]/g, ''));
+      if (km) params.set('km_max', km.replace(/[^0-9]/g, ''));
+      if (prix) params.set('prix_max', prix.replace(/[^0-9]/g, ''));
+      if (wilaya) params.set('wilaya', wilaya);
+      
+      const elec = document.getElementById('chk-elec').classList.contains('on');
+      if (elec) params.set('carburant', 'Électrique');
+
+      location.href = 'recherche.php?' + params.toString();
+    }
+
+    function resetSearch() {
+      document.getElementById('sel-marque').value = '';
+      document.getElementById('sel-modele').innerHTML = '<option value="">Quelconque</option>';
+      document.getElementById('sel-annee').value = '';
+      document.getElementById('sel-km').value = '';
+      document.getElementById('sel-prix').value = '';
+      document.getElementById('inp-wilaya').value = '';
+      document.getElementById('chk-elec').classList.remove('on');
+      setPayMode('achat');
+    }
+
+    function openAdvancedFilters() {
+      document.getElementById('advancedFilters').classList.add('show');
+      document.body.style.overflow = 'hidden';
+      buildAdvMarques();
+    }
+
+    function closeAdvancedFilters() {
+      document.getElementById('advancedFilters').classList.remove('show');
+      document.body.style.overflow = '';
+    }
 
     buildMarques();
 
@@ -2373,58 +2375,31 @@ function closeAdvancedFilters() {
     });
 
     function updateDealsArrows() {
-    const scrollBox = document.getElementById("deals-scroll");
-    const leftBtn = document.querySelector(".deals-nav-left");
-    const rightBtn = document.querySelector(".deals-nav-right");
-
-    if (!scrollBox || !leftBtn || !rightBtn) return;
-
-    const maxScroll = scrollBox.scrollWidth - scrollBox.clientWidth;
-
-    if (scrollBox.scrollLeft <= 5) {
-      leftBtn.classList.add("is-hidden");
-    } else {
-      leftBtn.classList.remove("is-hidden");
+      const scrollBox = document.getElementById("deals-scroll");
+      const leftBtn = document.querySelector(".deals-nav-left");
+      const rightBtn = document.querySelector(".deals-nav-right");
+      if (!scrollBox || !leftBtn || !rightBtn) return;
+      const maxScroll = scrollBox.scrollWidth - scrollBox.clientWidth;
+      if (scrollBox.scrollLeft <= 5) leftBtn.classList.add("is-hidden");
+      else leftBtn.classList.remove("is-hidden");
+      if (scrollBox.scrollLeft >= maxScroll - 5) rightBtn.classList.add("is-hidden");
+      else rightBtn.classList.remove("is-hidden");
     }
 
-    if (scrollBox.scrollLeft >= maxScroll - 5) {
-      rightBtn.classList.add("is-hidden");
-    } else {
-      rightBtn.classList.remove("is-hidden");
+    function scrollDeals(direction) {
+      const scrollBox = document.getElementById("deals-scroll");
+      if (!scrollBox) return;
+      scrollBox.scrollBy({ left: direction * 300, behavior: "smooth" });
+      setTimeout(updateDealsArrows, 350);
     }
-  }
 
-  function scrollDeals(direction) {
-    const scrollBox = document.getElementById("deals-scroll");
-    if (!scrollBox) return;
-
-    scrollBox.scrollBy({
-      left: direction * 300,
-      behavior: "smooth"
+    window.addEventListener("load", () => {
+      updateDealsArrows();
+      const scrollBox = document.getElementById("deals-scroll");
+      if (scrollBox) scrollBox.addEventListener("scroll", updateDealsArrows);
     });
 
-    setTimeout(updateDealsArrows, 350);
-  }
-
-  window.addEventListener("load", () => {
-    updateDealsArrows();
-
-    const scrollBox = document.getElementById("deals-scroll");
-    if (scrollBox) {
-      scrollBox.addEventListener("scroll", updateDealsArrows);
-    }
-  });
-
-  window.addEventListener("resize", updateDealsArrows); 
-    function openAdvancedFilters() {
-  document.getElementById('advancedFilters').classList.add('show');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeAdvancedFilters() {
-  document.getElementById('advancedFilters').classList.remove('show');
-  document.body.style.overflow = '';
-}
+    window.addEventListener("resize", updateDealsArrows);
 
     function toggleFav(id, btn) {
       const fd = new FormData();
@@ -2443,215 +2418,85 @@ function closeAdvancedFilters() {
         .catch(() => console.error('Erreur favori'));
     }
 
-  const aiSearchTexts = [
-    "Peugeot 208",
-    "BMW X3 automatique",
-    "Toyota Corolla hybride",
-    "Hyundai Tucson diesel",
-    "Mercedes Classe C AMG Line",
-    "Golf 8 GTI",
-    "Range Rover Evoque",
-    "Renault Clio 5 essence"
-  ];
+    const aiSearchTexts = [
+      "Peugeot 208",
+      "BMW X3 automatique",
+      "Toyota Corolla hybride",
+      "Hyundai Tucson diesel",
+      "Mercedes Classe C AMG Line",
+      "Golf 8 GTI",
+      "Range Rover Evoque",
+      "Renault Clio 5 essence"
+    ];
 
-  const aiInput = document.getElementById("ai-search-input");
+    const aiInput = document.getElementById("ai-search-input");
 
-  let textIndex = 0;
-  let charIndex = 0;
-  let isDeleting = false;
-  let cursorVisible = true;
-  let typingTimeout;
+    let textIndex = 0;
+    let charIndex = 0;
+    let isDeleting = false;
+    let cursorVisible = true;
+    let typingTimeout;
 
- function typeAiSearch() {
-  if (!aiInput) return;
-
-  if (document.activeElement === aiInput || aiInput.value.trim() !== "") {
-    aiInput.setAttribute("placeholder", "");
-    return;
-  }
-
-  const currentText = aiSearchTexts[textIndex];
-  const cursor = cursorVisible ? "|" : "";
-
-  if (!isDeleting) {
-    charIndex++;
-    aiInput.setAttribute("placeholder", currentText.substring(0, charIndex) + cursor);
-
-    if (charIndex < currentText.length) {
-      typingTimeout = setTimeout(typeAiSearch, 85);
-    } else {
-      isDeleting = true;
-      typingTimeout = setTimeout(typeAiSearch, 1400);
-    }
-  } else {
-    charIndex--;
-    aiInput.setAttribute("placeholder", currentText.substring(0, charIndex) + cursor);
-
-    if (charIndex > 0) {
-      typingTimeout = setTimeout(typeAiSearch, 40);
-    } else {
-      isDeleting = false;
-      textIndex = (textIndex + 1) % aiSearchTexts.length;
-      typingTimeout = setTimeout(typeAiSearch, 300);
-    }
-  }
-}
-
-  function blinkPlaceholderCursor() {
-    if (!aiInput) return;
-
-    if (document.activeElement === aiInput || aiInput.value.trim() !== "") return;
-
-    cursorVisible = !cursorVisible;
-
-    const currentText = aiSearchTexts[textIndex];
-    aiInput.setAttribute(
-      "placeholder",
-      currentText.substring(0, charIndex) + (cursorVisible ? "|" : "")
-    );
-  }
-  function onlyNumbers(input) {
-
-  input.value = input.value.replace(/[^0-9]/g, '');
-
-}
-
-function checkRangePair(minId, maxId, label) {
-
-  const minInput = document.getElementById(minId);
-
-  const maxInput = document.getElementById(maxId);
-
-  if (!minInput || !maxInput) return null;
-
-  const min = minInput.value !== '' ? Number(minInput.value) : null;
-
-  const max = maxInput.value !== '' ? Number(maxInput.value) : null;
-
-  minInput.classList.remove('error');
-
-  maxInput.classList.remove('error');
-
-  if (min !== null && min < 0) minInput.value = 0;
-
-  if (max !== null && max < 0) maxInput.value = 0;
-
-  if (min !== null && max !== null && min > max) {
-
-    minInput.classList.add('error');
-
-    maxInput.classList.add('error');
-
-    return label + " : la valeur minimum doit être inférieure à la valeur maximum.";
-
-  }
-
-  return null;
-
-}
-
-function checkRanges() {
-
-  const errorBox = document.getElementById('range-error');
-
-  const errors = [
-
-    checkRangePair('annee-min', 'annee-max', 'Année'),
-
-    checkRangePair('prix-min', 'prix-max', 'Prix'),
-
-    checkRangePair('km-min', 'km-max', 'Kilométrage'),
-
-    checkRangePair('perf-min', 'perf-max', 'Performance'),
-
-    checkRangePair('cylindree-min', 'cylindree-max', 'Cylindrée moteur'),
-
-    checkRangePair('reservoir-min', 'reservoir-max', 'Taille du réservoir'),
-
-    checkRangePair('poids-min', 'poids-max', 'Poids')
-
-  ].filter(Boolean);
-
-  if (errors.length > 0) {
-
-    if (errorBox) {
-
-      errorBox.textContent = errors[0];
-
-      errorBox.classList.remove('hidden');
-
+    function typeAiSearch() {
+      if (!aiInput) return;
+      if (document.activeElement === aiInput || aiInput.value.trim() !== "") {
+        aiInput.setAttribute("placeholder", "");
+        return;
+      }
+      const currentText = aiSearchTexts[textIndex];
+      const cursor = cursorVisible ? "|" : "";
+      if (!isDeleting) {
+        charIndex++;
+        aiInput.setAttribute("placeholder", currentText.substring(0, charIndex) + cursor);
+        if (charIndex < currentText.length) typingTimeout = setTimeout(typeAiSearch, 85);
+        else { isDeleting = true; typingTimeout = setTimeout(typeAiSearch, 1400); }
+      } else {
+        charIndex--;
+        aiInput.setAttribute("placeholder", currentText.substring(0, charIndex) + cursor);
+        if (charIndex > 0) typingTimeout = setTimeout(typeAiSearch, 40);
+        else {
+          isDeleting = false;
+          textIndex = (textIndex + 1) % aiSearchTexts.length;
+          typingTimeout = setTimeout(typeAiSearch, 300);
+        }
+      }
     }
 
-    return false;
-
-  }
-
-  if (errorBox) errorBox.classList.add('hidden');
-
-  return true;
-
-}
-
-function resetAdvancedFilters() {
-
-  const box = document.getElementById('advancedFilters');
-
-  if (!box) return;
-
-  box.querySelectorAll('input').forEach(input => {
-
-    if (input.type === 'checkbox' || input.type === 'radio') {
-
-      input.checked = false;
-
-    } else {
-
-      input.value = '';
-
+    function blinkPlaceholderCursor() {
+      if (!aiInput) return;
+      if (document.activeElement === aiInput || aiInput.value.trim() !== "") return;
+      cursorVisible = !cursorVisible;
+      const currentText = aiSearchTexts[textIndex];
+      aiInput.setAttribute("placeholder", currentText.substring(0, charIndex) + (cursorVisible ? "|" : ""));
     }
 
-    input.classList.remove('error');
-
-  });
-
-  box.querySelectorAll('select').forEach(select => {
-
-    select.selectedIndex = 0;
-
-  });
-
-  const vendeurDefault = box.querySelector('input[name="vendeur"]');
-
-  if (vendeurDefault) vendeurDefault.checked = true;
-
-  const errorBox = document.getElementById('range-error');
-
-  if (errorBox) {
-
-    errorBox.textContent = '';
-
-    errorBox.classList.add('hidden');
-
-  }
-}
-  window.addEventListener("load", () => {
-    typeAiSearch();
-    setInterval(blinkPlaceholderCursor, 500);
-  });
-
-  aiInput.addEventListener("focus", () => {
-    clearTimeout(typingTimeout);
-    aiInput.setAttribute("placeholder", "");
-  });
-
-  aiInput.addEventListener("blur", () => {
-    if (aiInput.value.trim() === "") {
-      clearTimeout(typingTimeout);
-      charIndex = 0;
-      isDeleting = false;
-      typingTimeout = setTimeout(typeAiSearch, 300);
+    /* Enter dans la barre IA */
+    if (aiInput) {
+      aiInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') doAISearch();
+      });
     }
-  });
+
+    window.addEventListener("load", () => {
+      typeAiSearch();
+      setInterval(blinkPlaceholderCursor, 500);
+    });
+
+    if (aiInput) {
+      aiInput.addEventListener("focus", () => {
+        clearTimeout(typingTimeout);
+        aiInput.setAttribute("placeholder", "");
+      });
+
+      aiInput.addEventListener("blur", () => {
+        if (aiInput.value.trim() === "") {
+          clearTimeout(typingTimeout);
+          charIndex = 0;
+          isDeleting = false;
+          typingTimeout = setTimeout(typeAiSearch, 300);
+        }
+      });
+    }
   </script>
   <?php include 'filtresAvances.php'; ?>
 </body>
