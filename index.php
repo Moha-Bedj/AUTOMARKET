@@ -5,6 +5,8 @@ $publie = isset($_GET['publie']) && $_GET['publie'] == '1';
 $counts_type = ['voiture' => 0, 'moto' => 0, 'camion' => 0];
 $marquesDB = [];
 
+
+
 $sql = "
 SELECT 
   ma.idMarque,
@@ -1628,6 +1630,8 @@ body {
           </svg>
         </a>
 
+        <?php include 'notif_dropdown.php'; ?>
+
         <div class="user-menu" onclick="toggleMenu()">
           <?php if (!empty($_SESSION['photo'])): ?>
             <img src="<?= htmlspecialchars($_SESSION['photo']) ?>"
@@ -1663,6 +1667,7 @@ body {
             </a>
           <?php endif; ?>
 
+
           <hr style="border:none;border-top:0.5px solid var(--bd);margin:4px 0">
           <a href="deconnexion.php" class="dropdown-item" style="color:var(--red)">Se déconnecter</a>
         </div>
@@ -1671,6 +1676,8 @@ body {
       <?php endif; ?>
     </div>
   </nav>
+
+  <?php include 'notif_banner.php'; ?>
 
   <?php if ($publie): ?>
     <div class="publish-success">
