@@ -106,8 +106,8 @@ $sql_top = "
         (SELECT urlPhoto FROM Photos WHERE idAnnonce = a.idAnnonce ORDER BY ordrePhoto ASC LIMIT 1) AS photo_principale
     FROM Annonce a
     INNER JOIN Vehicule v  ON a.idVehicule = v.idVehicule
-    INNER JOIN Modele mo   ON v.idModele = mo.idModele
-    INNER JOIN Marque ma   ON mo.idMarque = ma.idMarque
+    INNER JOIN modele mo   ON v.idModele = mo.idModele
+    INNER JOIN marque ma   ON mo.idMarque = ma.idMarque
     WHERE a.statutAnnonce = 'active'
       AND a.idVendeur != ''
       AND a.idVendeur IS NOT NULL
@@ -1538,6 +1538,85 @@ body {
 .ai-search-box:focus-within .typing-cursor {
   color: var(--t2);
 }
+      /* ═══ MARQUES POPULAIRES ═══ */
+.popular-brands {
+  width: min(1200px, calc(100% - 48px));
+  margin: 40px auto;
+  background: var(--bg0);
+  border: 0.5px solid var(--bd);
+  border-radius: 18px;
+  padding: 34px 38px 36px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.10);
+}
+
+.popular-brands-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--t1);
+  margin-bottom: 28px;
+  letter-spacing: -0.4px;
+}
+
+.brands-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  border-top: 0.5px solid transparent;
+}
+
+.brand-item {
+  height: 130px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-decoration: none;
+  color: var(--t1);
+  border-right: 0.5px solid var(--bd);
+  border-bottom: 0.5px solid var(--bd);
+  transition: background .15s, transform .15s;
+}
+
+.brand-item:nth-child(6n) {
+  border-right: none;
+}
+
+.brand-item:nth-child(n+7) {
+  border-bottom: none;
+}
+
+.brand-item:hover {
+  background: var(--bg1);
+  transform: translateY(-2px);
+}
+
+.brand-logo {
+  height: 42px;
+  max-width: 78px;
+  object-fit: contain;
+  filter: grayscale(1);
+  opacity: .9;
+}
+
+.brand-name {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--t1);
+  text-align: center;
+}
+
+/* fallback si logo manquant */
+.brand-logo-text {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 2px solid var(--t1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+}
 
 @media (max-width: 900px) {
   .top-deals {
@@ -1592,6 +1671,69 @@ body {
   .deals-scroll { gap: 14px; }
   .deal-card { flex: 0 0 245px; width: 245px; }
   .deal-img { height: 155px; }
+    @media (max-width: 900px) {
+  .popular-brands {
+    width: calc(100% - 24px);
+    padding: 24px 20px;
+  }
+
+  .brands-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .brand-item:nth-child(6n) {
+    border-right: 0.5px solid var(--bd);
+  }
+
+  .brand-item:nth-child(3n) {
+    border-right: none;
+  }
+
+  .brand-item:nth-child(n+7) {
+    border-bottom: 0.5px solid var(--bd);
+  }
+
+  .brand-item:nth-child(n+10) {
+    border-bottom: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .popular-brands {
+    width: calc(100% - 20px);
+    margin: 24px auto;
+    padding: 20px 14px;
+  }
+
+  .popular-brands-title {
+    font-size: 22px;
+    margin-bottom: 18px;
+  }
+
+  .brands-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .brand-item {
+    height: 115px;
+  }
+
+  .brand-item:nth-child(3n) {
+    border-right: 0.5px solid var(--bd);
+  }
+
+  .brand-item:nth-child(2n) {
+    border-right: none;
+  }
+
+  .brand-item:nth-child(n+10) {
+    border-bottom: 0.5px solid var(--bd);
+  }
+
+  .brand-item:nth-child(n+11) {
+    border-bottom: none;
+  }
+}
 }
   </style>
 </head>
@@ -1980,148 +2122,75 @@ body {
   </div>
 </section>
 <?php endif; ?>
+<!-- ══ MARQUES POPULAIRES ══ -->
+<section class="popular-brands">
+  <h2 class="popular-brands-title">Marques populaires</h2>
 
-  <div class="body-wrap">
-    <main>
-      <div class="sell-banner">
-        <div class="sell-banner-text">
-          <div class="sell-banner-title">Vous souhaitez vendre votre véhicule ?</div>
-          <div class="sell-banner-sub">Annonce gratuite · Visible par des milliers d'acheteurs · Réponse rapide</div>
-        </div>
-        <button class="btn-white" onclick="location.href='publier.php'">Déposer une annonce</button>
-      </div>
+  <div class="brands-grid">
 
-      <div class="results-head">
-        <div class="results-count">
-          <span id="total-count">
-            <?php
-            $sql_count = "SELECT COUNT(*) AS total FROM Annonce WHERE statutAnnonce='active'";
-            $res_count = mysqli_query($conn, $sql_count);
-            $total = mysqli_fetch_assoc($res_count)['total'] ?? 0;
-            echo number_format($total, 0, ',', ' ');
-            ?>
-          </span> annonces trouvées
-        </div>
-        <div class="sort-row">
-          <span class="sort-label">Trier :</span>
-          <select class="sort-sel">
-            <option value="date_desc">Les plus récentes</option>
-            <option value="prix_asc">Prix croissant</option>
-            <option value="prix_desc">Prix décroissant</option>
-            <option value="km_asc">Kilométrage ↑</option>
-            <option value="annee_desc">Année décroissante</option>
-          </select>
-          <div class="view-btns">
-            <button class="view-btn active" title="Vue liste" onclick="setView(this)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
-              </svg>
-            </button>
-            <button class="view-btn" title="Vue grille" onclick="setView(this)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="7" height="7"/>
-                <rect x="14" y="3" width="7" height="7"/>
-                <rect x="3" y="14" width="7" height="7"/>
-                <rect x="14" y="14" width="7" height="7"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
+    <a href="recherche.php?marque=Audi" class="brand-item">
+      <img src="images/brands/audi.png" alt="Audi" class="brand-logo">
+      <span class="brand-name">Audi</span>
+    </a>
 
-      <div class="listings" id="listings-container">
-        <?php
-        $sql_annonces = "
-            SELECT
-                a.idAnnonce, a.titre, a.prix, a.localisation,
-                a.datePublication, a.vendeurVerif,
-                v.annee, v.kilometrage, v.carburant, v.transmission,
-                u.nom AS vendeur_nom, u.prenom AS vendeur_prenom,
-                (SELECT urlPhoto FROM Photos WHERE idAnnonce = a.idAnnonce ORDER BY ordrePhoto ASC LIMIT 1) AS photo_principale
-            FROM Annonce a, Vehicule v, Utilisateur u
-            WHERE a.idVehicule = v.idVehicule
-            AND a.idVendeur = u.idUtilisateur
-            AND a.statutAnnonce = 'active'
-            ORDER BY a.datePublication DESC
-            LIMIT 20
-        ";
-        $res_annonces = mysqli_query($conn, $sql_annonces);
+    <a href="recherche.php?marque=Cupra" class="brand-item">
+      <img src="images/brands/Cupra.png" alt="Cupra" class="brand-logo">
+      <span class="brand-name">Cupra</span>
+    </a>
 
-        if (!$res_annonces || mysqli_num_rows($res_annonces) == 0) {
-            echo '<div style="padding:40px;text-align:center;color:#888">Aucune annonce.</div>';
-        } else {
-            while ($a = mysqli_fetch_assoc($res_annonces)) {
-                $titre = htmlspecialchars($a['titre']);
-                $prix  = number_format($a['prix'], 0, ',', ' ');
-                $loc   = htmlspecialchars($a['localisation']);
-                $nom   = htmlspecialchars($a['vendeur_nom'] . ' ' . $a['vendeur_prenom']);
-                $km    = number_format($a['kilometrage'], 0, ',', ' ');
-                $annee = $a['annee'];
-                $carbu = $a['carburant'];
-                $trans = $a['transmission'];
-                $pro   = $a['vendeurVerif'] == 1;
+    <a href="recherche.php?marque=Mercedes" class="brand-item">
+      <img src="images/brands/mercedes.png" alt="Mercedes-Benz" class="brand-logo">
+      <span class="brand-name">Mercedes-Benz</span>
+    </a>
 
-                $date = new DateTime($a['datePublication']);
-                $diff = (new DateTime())->diff($date)->days;
-                if ($diff == 0)     $dl = "Aujourd'hui";
-                elseif ($diff == 1) $dl = "Hier";
-                else                $dl = "Il y a $diff jours";
+    <a href="recherche.php?marque=Volkswagen" class="brand-item">
+      <img src="images/brands/volkswagen.png" alt="Volkswagen" class="brand-logo">
+      <span class="brand-name">Volkswagen</span>
+    </a>
 
-                $photo = $a['photo_principale'] ?? null;
-                if ($photo) {
-                    $photoEsc = htmlspecialchars($photo);
-                    $imgBlock = "<img src='$photoEsc' alt='$titre' onerror=\"this.style.display='none';this.nextElementSibling.style.display='flex';\">
-                                 <div class='lcard-img-ph' style='display:none'>
-                                   <svg width='44' height='44' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='0.8'>
-                                     <rect x='1' y='6' width='22' height='13' rx='3'/>
-                                     <circle cx='7' cy='16' r='1.5'/><circle cx='17' cy='16' r='1.5'/>
-                                   </svg>
-                                 </div>";
-                } else {
-                    $imgBlock = "<div class='lcard-img-ph'>
-                                   <svg width='44' height='44' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='0.8'>
-                                     <rect x='1' y='6' width='22' height='13' rx='3'/>
-                                     <circle cx='7' cy='16' r='1.5'/><circle cx='17' cy='16' r='1.5'/>
-                                   </svg>
-                                 </div>";
-                }
+    <a href="recherche.php?marque=Toyota" class="brand-item">
+      <img src="images/brands/toyota.png" alt="Toyota" class="brand-logo">
+      <span class="brand-name">Toyota</span>
+    </a>
 
-                echo "
-                <div class='lcard' onclick=\"location.href='fiche_annonce.php?id={$a['idAnnonce']}'\">
-                  <div class='lcard-img'>
-                    $imgBlock
-                  </div>
-                  <div class='lcard-body'>
-                    <div class='lcard-top'>
-                      <div class='lcard-title'>$titre</div>
-                      <div class='lcard-price'>$prix DA</div>
-                    </div>
-                    <div class='lcard-specs'>
-                      <span class='lspec'>$annee</span>
-                      <span class='lspec-dot'></span>
-                      <span class='lspec'>$km km</span>
-                      <span class='lspec-dot'></span>
-                      <span class='lspec'>$carbu</span>
-                      <span class='lspec-dot'></span>
-                      <span class='lspec'>$trans</span>
-                      <span class='lspec-dot'></span>
-                      <span class='lspec'>$loc</span>
-                    </div>
-                    <div class='lcard-foot'>
-                      <div class='lseller'>
-                        $nom
-                        " . ($pro ? "<span class='seller-badge'>Pro vérifié</span>" : "") . "
-                      </div>
-                      <div class='ldate'>$dl</div>
-                    </div>
-                  </div>
-                </div>";
-            }
-        }
-        ?>
-      </div>
-    </main>
+    <a href="recherche.php?marque=Renault" class="brand-item">
+      <img src="images/brands/renault.png" alt="Renault" class="brand-logo">
+      <span class="brand-name">Renault</span>
+    </a>
+
+    <a href="recherche.php?marque=Peugeot" class="brand-item">
+      <img src="images/brands/peugeot.png" alt="Peugeot" class="brand-logo">
+      <span class="brand-name">Peugeot</span>
+    </a>
+
+    <a href="recherche.php?marque=Hyundai" class="brand-item">
+      <img src="images/brands/hyundai.png" alt="Hyundai" class="brand-logo">
+      <span class="brand-name">Hyundai</span>
+    </a>
+
+    <a href="recherche.php?marque=Dacia" class="brand-item">
+      <img src="images/brands/dacia.png" alt="Dacia" class="brand-logo">
+      <span class="brand-name">Dacia</span>
+    </a>
+
+    <a href="recherche.php?marque=Ford" class="brand-item">
+      <img src="images/brands/ford.png" alt="Ford" class="brand-logo">
+      <span class="brand-name">Ford</span>
+    </a>
+
+    <a href="recherche.php?marque=Kia" class="brand-item">
+      <img src="images/brands/kia.png" alt="Kia" class="brand-logo">
+      <span class="brand-name">Kia</span>
+    </a>
+
+    <a href="recherche.php?marque=Opel" class="brand-item">
+      <img src="images/brands/opel.png" alt="Opel" class="brand-logo">
+      <span class="brand-name">Opel</span>
+    </a>
+
   </div>
+</section>
+  
 
   <footer class="footer">
     © 2026 AUTOMARKET — Marketplace automobile algérienne &nbsp;·&nbsp;

@@ -1,7 +1,7 @@
 <?php
 session_start();
 require_once 'connexion.php';
-require_once 'doublons.php';
+
 
 if (!isset($_SESSION['idUtilisateur'])) {
     header("Location: connexion.php?redirect=publier.php");
@@ -9,8 +9,197 @@ if (!isset($_SESSION['idUtilisateur'])) {
 }
 $idUser = $_SESSION['idUtilisateur'];
 $idUserSql = mysqli_real_escape_string($conn, $idUser);
-$rUser = mysqli_query($conn, "SELECT nom, prenom, numTel FROM Utilisateur WHERE idUtilisateur = '$idUserSql'");
-$user = mysqli_fetch_assoc($rUser) ?: ['nom'=>'', 'prenom'=>'', 'numTel'=>''];
+
+$rUser = mysqli_query($conn, "
+    SELECT nom, prenom, numTel, role, badgeVerifie
+    FROM Utilisateur 
+    WHERE idUtilisateur = '$idUserSql'
+    LIMIT 1
+");
+
+$user = mysqli_fetch_assoc($rUser) ?: [
+    'nom' => '',
+    'prenom' => '',
+    'numTel' => '',
+    'role' => 'utilisateur',
+    'badgeVerifie' => 0
+];
+
+/*
+  Logique :
+  - Si l'utilisateur n'a PAS de ligne dans Concessionnaire :
+    c'est un particulier → il peut publier.
+  - Si l'utilisateur a une ligne dans Concessionnaire :
+    il a demandé un compte Pro.
+    Donc il doit être validé pour publier.
+*/
+
+$rPro = mysqli_query($conn, "
+    SELECT statutPro, justificatifRegistre
+    FROM Concessionnaire
+    WHERE idUtilisateur = '$idUserSql'
+    LIMIT 1
+");
+
+$pro = $rPro ? mysqli_fetch_assoc($rPro) : null;
+
+$estCompteProDemande = $pro ? true : false;
+
+$estConcessionnaireValide = (
+    $pro
+    && ($pro['statutPro'] ?? '') === 'valide'
+    && ($user['role'] ?? '') === 'concessionnaire'
+);
+
+/*
+  On bloque seulement si l'utilisateur a demandé un compte Pro
+  mais qu'il n'est pas encore validé.
+*/
+if ($estCompteProDemande && !$estConcessionnaireValide) {
+    ?>
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+      <meta charset="UTF-8">
+      <title>Compte Pro en attente — AUTOMARKET</title>
+      <link rel="icon" href="images/logo.png">
+      <style>
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{
+          font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+          background:#f5f4f0;
+          color:#1a1a18;
+          min-height:100vh;
+        }
+        .nav{
+          height:56px;
+          background:white;
+          border-bottom:0.5px solid rgba(0,0,0,.11);
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          padding:0 28px;
+        }
+        .nav img{height:34px}
+        .nav a{
+          color:#185FA5;
+          text-decoration:none;
+          font-size:14px;
+        }
+        .container{
+          max-width:650px;
+          margin:70px auto;
+          padding:0 18px;
+        }
+        .card{
+          background:white;
+          border:0.5px solid rgba(0,0,0,.11);
+          border-radius:16px;
+          padding:34px;
+          box-shadow:0 8px 24px rgba(0,0,0,.06);
+          text-align:center;
+        }
+        .icon{
+          width:64px;
+          height:64px;
+          border-radius:50%;
+          background:#FAEEDA;
+          color:#854F0B;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          margin:0 auto 18px;
+        }
+        h1{
+          font-size:24px;
+          margin-bottom:10px;
+        }
+        p{
+          color:#5f5e5a;
+          font-size:14px;
+          line-height:1.6;
+          margin-bottom:22px;
+        }
+        .status{
+          background:#f5f4f0;
+          border-radius:10px;
+          padding:14px;
+          margin-bottom:22px;
+          font-size:14px;
+          text-align:left;
+        }
+        .status strong{
+          color:#1a1a18;
+        }
+        .btn{
+          display:inline-block;
+          background:#185FA5;
+          color:white;
+          padding:12px 18px;
+          border-radius:8px;
+          text-decoration:none;
+          font-weight:600;
+          font-size:14px;
+          margin:4px;
+        }
+        .btn:hover{background:#0C447C}
+        .btn-secondary{
+          background:#E6F1FB;
+          color:#185FA5;
+        }
+        .btn-secondary:hover{
+          background:#B5D4F4;
+        }
+      </style>
+    </head>
+    <body>
+
+    <nav class="nav">
+      <a href="index.php">
+        <img src="images/logo.png" alt="AUTOMARKET">
+      </a>
+      <a href="index.php">Retour au site</a>
+    </nav>
+
+    <div class="container">
+      <div class="card">
+        <div class="icon">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+
+        <h1>Compte professionnel en attente</h1>
+
+        <p>
+          Vous avez demandé un compte professionnel. Avant de publier comme concessionnaire,
+          votre compte doit être vérifié par un administrateur.
+        </p>
+
+        <div class="status">
+          <?php if (($pro['statutPro'] ?? '') === 'en_attente_verification'): ?>
+            <strong>Statut :</strong> justificatif du registre de commerce demandé.
+          <?php elseif (($pro['statutPro'] ?? '') === 'en_attente_admin'): ?>
+            <strong>Statut :</strong> justificatif envoyé, en attente de validation admin.
+          <?php elseif (($pro['statutPro'] ?? '') === 'refuse'): ?>
+            <strong>Statut :</strong> demande refusée. Vous pouvez renvoyer un justificatif.
+          <?php else: ?>
+            <strong>Statut :</strong> <?= htmlspecialchars($pro['statutPro'] ?? 'non défini') ?>
+          <?php endif; ?>
+        </div>
+
+        <a href="verification_compte_pro.php" class="btn">Voir ma vérification</a>
+        <a href="index.php" class="btn btn-secondary">Retour à l’accueil</a>
+      </div>
+    </div>
+
+    </body>
+    </html>
+    <?php
+    exit;
+}
 $marquesDB = [];
 
 $sqlMarques = "
@@ -18,9 +207,9 @@ SELECT
   ma.nomMarque,
   mo.nomModele,
   ve.nomVersion
-FROM Marque ma
-LEFT JOIN Modele mo ON mo.idMarque = ma.idMarque
-LEFT JOIN Version ve ON ve.idModele = mo.idModele
+FROM marque ma
+LEFT JOIN modele mo ON mo.idMarque = ma.idMarque
+LEFT JOIN version ve ON ve.idModele = mo.idModele
 ORDER BY ma.nomMarque, mo.nomModele, ve.nomVersion
 ";
 
@@ -132,12 +321,14 @@ if (!$immatriculation) $errors[] = "Immatriculation obligatoire.";
     LIMIT 1
 ");
 
+$scoreDoublon = 0;
+$motifModeration = '';
+$statutAnnonce = 'active';
+
 if ($checkDoublon && mysqli_num_rows($checkDoublon) > 0) {
-    echo json_encode([
-        'success' => false,
-        'errors' => ['Ce véhicule semble déjà publié. L’annonce doit être vérifiée par un administrateur.']
-    ]);
-    exit;
+    $scoreDoublon = 90;
+    $motifModeration = "Annonce potentiellement doublon : même VIN ou même immatriculation.";
+    $statutAnnonce = 'en_attente';
 }
 
     mysqli_begin_transaction($conn);
@@ -145,24 +336,24 @@ if ($checkDoublon && mysqli_num_rows($checkDoublon) > 0) {
     try {
         /* === Résolution dynamique idMarque (créer si n'existe pas) === */
         $marqueE = mysqli_real_escape_string($conn, $marque);
-        $rM = mysqli_query($conn, "SELECT idMarque FROM Marque WHERE nomMarque='$marqueE' LIMIT 1");
+        $rM = mysqli_query($conn, "SELECT idMarque FROM marque WHERE nomMarque='$marqueE' LIMIT 1");
         if ($rM && mysqli_num_rows($rM) > 0) {
             $idMarque = mysqli_fetch_assoc($rM)['idMarque'];
         } else {
             $idMarque = uuid();
-            if (!mysqli_query($conn, "INSERT INTO Marque (idMarque, nomMarque) VALUES ('$idMarque', '$marqueE')")) {
+            if (!mysqli_query($conn, "INSERT INTO marque (idMarque, nomMarque) VALUES ('$idMarque', '$marqueE')")) {
                 throw new Exception("Erreur creation Marque : " . mysqli_error($conn));
             }
         }
 
         /* === Résolution dynamique idModele (créer si n'existe pas) === */
         $modeleE = mysqli_real_escape_string($conn, $modele);
-        $rMod = mysqli_query($conn, "SELECT idModele FROM Modele WHERE nomModele='$modeleE' AND idMarque='$idMarque' LIMIT 1");
+        $rMod = mysqli_query($conn, "SELECT idModele FROM modele WHERE nomModele='$modeleE' AND idMarque='$idMarque' LIMIT 1");
         if ($rMod && mysqli_num_rows($rMod) > 0) {
             $idModele = mysqli_fetch_assoc($rMod)['idModele'];
         } else {
             $idModele = uuid();
-            if (!mysqli_query($conn, "INSERT INTO Modele (idModele, nomModele, idMarque) VALUES ('$idModele', '$modeleE', '$idMarque')")) {
+            if (!mysqli_query($conn, "INSERT INTO modele (idModele, nomModele, idMarque) VALUES ('$idModele', '$modeleE', '$idMarque')")) {
                 throw new Exception("Erreur creation Modele : " . mysqli_error($conn));
             }
         }
@@ -171,12 +362,12 @@ if ($checkDoublon && mysqli_num_rows($checkDoublon) > 0) {
         $idVersion = null;
         if ($version) {
             $versionE = mysqli_real_escape_string($conn, $version);
-            $rVer = mysqli_query($conn, "SELECT idVersion FROM Version WHERE nomVersion='$versionE' AND idModele='$idModele' LIMIT 1");
+            $rVer = mysqli_query($conn, "SELECT idVersion FROM version WHERE nomVersion='$versionE' AND idModele='$idModele' LIMIT 1");
             if ($rVer && mysqli_num_rows($rVer) > 0) {
                 $idVersion = mysqli_fetch_assoc($rVer)['idVersion'];
             } else {
                 $idVersion = uuid();
-                mysqli_query($conn, "INSERT INTO Version (idVersion, nomVersion, idModele) VALUES ('$idVersion', '$versionE', '$idModele')");
+                mysqli_query($conn, "INSERT INTO version (idVersion, nomVersion, idModele) VALUES ('$idVersion', '$versionE', '$idModele')");
             }
         }
 
@@ -337,13 +528,13 @@ VALUES
             foreach ($equipements as $eqLib) {
                 $eqLibE = mysqli_real_escape_string($conn, trim($eqLib));
                 if (!$eqLibE) continue;
-                $rE = mysqli_query($conn, "SELECT idEquipement FROM Equipement WHERE libelleEquipement='$eqLibE' LIMIT 1");
+                $rE = mysqli_query($conn, "SELECT idEquipement FROM equipement WHERE libelleEquipement='$eqLibE' LIMIT 1");
                 $idEq = null;
                 if ($rE && mysqli_num_rows($rE) > 0) {
                     $idEq = mysqli_fetch_assoc($rE)['idEquipement'];
                 } else {
                     $idEq = uuid();
-                    mysqli_query($conn, "INSERT INTO Equipement (idEquipement, libelleEquipement) VALUES ('$idEq', '$eqLibE')");
+                    mysqli_query($conn, "INSERT INTO equipement (idEquipement, libelleEquipement) VALUES ('$idEq', '$eqLibE')");
                 }
                 if ($idEq) {
                     mysqli_query($conn, "INSERT INTO Vehicule_Equipement (idVehicule, idEquipement) VALUES ('$idVehicule', '$idEq')");
