@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'connexion.php';
+require_once 'notification_helper.php';
 $publie = isset($_GET['publie']) && $_GET['publie'] == '1';
 $counts_type = ['voiture' => 0, 'moto' => 0, 'camion' => 0];
 $marquesDB = [];

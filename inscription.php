@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'connexion.php';
+require_once 'notification_helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json'); /* ← ICI seulement */
@@ -100,19 +101,33 @@ if ($action === 'register') {
     $tel    = $_POST['tel']    ?? '';
     $wilaya = $_POST['wilaya'] ?? '';
 
+    $typeCompte = $_POST['typeCompte'] ?? 'particulier';
+
+    $nomEntreprise = trim($_POST['nomEntreprise'] ?? '');
+    $numRC         = trim($_POST['numRC'] ?? '');
+    $siteWeb       = trim($_POST['siteWeb'] ?? '');
+
     if (!$email || !$pass || !$nom || !$prenom) {
         echo json_encode(['success'=>false,'message'=>'Champs manquants']);
         exit;
     }
 
+    if ($typeCompte === 'pro' && (!$nomEntreprise || !$numRC)) {
+        echo json_encode([
+            'success'=>false,
+            'message'=>'Veuillez remplir le nom de l’entreprise et le numéro RC.'
+        ]);
+        exit;
+    }
+
     $e = mysqli_real_escape_string($conn, $email);
     $res = mysqli_query($conn, "SELECT idUtilisateur FROM Utilisateur WHERE email='$e'");
+
     if (mysqli_num_rows($res) > 0) {
         echo json_encode(['success'=>false,'message'=>'Email déjà utilisé']);
         exit;
     }
 
-    /* Générer un UUID */
     $id = sprintf('%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
         mt_rand(0,0xffff), mt_rand(0,0xffff),
         mt_rand(0,0xffff),
@@ -122,18 +137,99 @@ if ($action === 'register') {
     );
 
     $hash = password_hash($pass, PASSWORD_DEFAULT);
-    $n    = mysqli_real_escape_string($conn, $nom);
-    $p    = mysqli_real_escape_string($conn, $prenom);
-    $t    = mysqli_real_escape_string($conn, $tel);
-    $w    = mysqli_real_escape_string($conn, $wilaya);
 
-    $ok = mysqli_query($conn, "INSERT INTO Utilisateur 
-        (idUtilisateur, nom, prenom, email, motDePasse, numTel, wilaya, statut, role, dateInscription, emailVerifie, badgeVerifie)
-        VALUES 
-        ('$id', '$n', '$p', '$e', '$hash', '$t', '$w', 'actif', 'utilisateur', CURDATE(), 0, 0)");
+    $n  = mysqli_real_escape_string($conn, $nom);
+    $p  = mysqli_real_escape_string($conn, $prenom);
+    $t  = mysqli_real_escape_string($conn, $tel);
+    $w  = mysqli_real_escape_string($conn, $wilaya);
 
-    if (!$ok) {
-        echo json_encode(['success'=>false,'message'=>'Erreur SQL : '.mysqli_error($conn)]);
+    $ne = mysqli_real_escape_string($conn, $nomEntreprise);
+    $rc = mysqli_real_escape_string($conn, $numRC);
+    $sw = mysqli_real_escape_string($conn, $siteWeb);
+
+    mysqli_begin_transaction($conn);
+
+    try {
+        /*
+          1. On crée toujours l'utilisateur comme utilisateur normal.
+          Même s'il choisit Pro, son role reste utilisateur au début.
+        */
+        $ok1 = mysqli_query($conn, "
+            INSERT INTO Utilisateur 
+            (idUtilisateur, nom, prenom, email, motDePasse, numTel, wilaya, statut, role, dateInscription, emailVerifie, badgeVerifie)
+            VALUES 
+            ('$id', '$n', '$p', '$e', '$hash', '$t', '$w', 'actif', 'utilisateur', CURDATE(), 0, 0)
+        ");
+
+        if (!$ok1) {
+            throw new Exception('Utilisateur : ' . mysqli_error($conn));
+        }
+
+        /*
+          2. On crée aussi Acheteur.
+        */
+        $ok2 = mysqli_query($conn, "
+            INSERT INTO Acheteur (idUtilisateur)
+            VALUES ('$id')
+        ");
+
+        if (!$ok2) {
+            throw new Exception('Acheteur : ' . mysqli_error($conn));
+        }
+
+        /*
+          3. On crée Vendeur, car Concessionnaire dépend souvent de Vendeur.
+          Mais il ne pourra pas publier tant que son compte Pro n'est pas validé.
+        */
+        $typeVendeur = ($typeCompte === 'pro') ? 'professionnel_en_attente' : 'particulier';
+
+        $ok3 = mysqli_query($conn, "
+            INSERT INTO Vendeur (idUtilisateur, typeVendeur, nbrAnnonceAct)
+            VALUES ('$id', '$typeVendeur', 0)
+        ");
+
+        if (!$ok3) {
+            throw new Exception('Vendeur : ' . mysqli_error($conn));
+        }
+
+        /*
+          4. Si l'utilisateur a choisi compte Pro,
+          on crée une ligne Concessionnaire en attente de vérification.
+        */
+        if ($typeCompte === 'pro') {
+            $ok4 = mysqli_query($conn, "
+                INSERT INTO Concessionnaire
+                (idUtilisateur, nomEntreprise, adresseEntreprise, siteWeb, numRegistreCommerce, statutPro, justificatifRegistre, dateDemandePro)
+                VALUES
+                ('$id', '$ne', '', '$sw', '$rc', 'en_attente_verification', NULL, NOW())
+            ");
+
+            if (!$ok4) {
+                throw new Exception('Concessionnaire : ' . mysqli_error($conn));
+            }
+
+            /*
+              5. Notification à l'utilisateur :
+              il doit envoyer son PDF/PNG du registre de commerce.
+            */
+            creerNotification(
+                $conn,
+                $id,
+                "Votre compte professionnel est créé. Veuillez envoyer un justificatif du registre de commerce pour finaliser la vérification.",
+                "pro_attente",
+                "verification_compte_pro.php"
+            );
+        }
+
+        mysqli_commit($conn);
+
+    } catch (Exception $ex) {
+        mysqli_rollback($conn);
+
+        echo json_encode([
+            'success' => false,
+            'message' => 'Erreur SQL : ' . $ex->getMessage()
+        ]);
         exit;
     }
 
@@ -141,8 +237,12 @@ if ($action === 'register') {
     $_SESSION['email']  = $email;
     $_SESSION['nom']    = $nom;
     $_SESSION['prenom'] = $prenom;
+    $_SESSION['role']   = 'utilisateur';
 
-    echo json_encode(['success'=>true]);
+    echo json_encode([
+        'success'=>true,
+        'typeCompte'=>$typeCompte
+    ]);
     exit;
 }
 
@@ -1174,6 +1274,7 @@ oninput="validatePhoneInput(this)">
 
   fetch('inscription.php', { method: 'POST', body: fd })
     .then(r => r.json())
+    
     .then(json => {
       if (json.success) {
         document.getElementById('login-success').classList.remove('hidden');
@@ -1250,6 +1351,12 @@ oninput="validatePhoneInput(this)">
   const regAlert     = document.getElementById('reg-alert');
   const regAlertText = document.getElementById('reg-alert-text');
   const regSuccess   = document.getElementById('reg-success');
+  const isPro = document.getElementById('rtab-pro').classList.contains('active');
+  const typeCompte = isPro ? 'pro' : 'particulier';
+
+  const nomEntreprise = document.getElementById('pro-nom-entreprise')?.value.trim() || '';
+  const numRC = document.getElementById('pro-rc')?.value.trim() || '';
+  const siteWeb = document.getElementById('pro-siteweb')?.value.trim() || '';
 
   regAlert.classList.add('hidden');
   regSuccess.classList.add('hidden');
@@ -1285,15 +1392,32 @@ oninput="validatePhoneInput(this)">
   fd.append('pass',    pass);
   fd.append('tel',     tel);
   fd.append('wilaya',  wilaya);
+  fd.append('typeCompte', typeCompte);
+  fd.append('nomEntreprise', nomEntreprise);
+  fd.append('numRC', numRC);
+  fd.append('siteWeb', siteWeb);
+  
 
   fetch('inscription.php', { method: 'POST', body: fd })
     .then(r => r.json())
     .then(json => {
       if (json.success) {
-        regSuccess.classList.remove('hidden');
-        document.getElementById('reg-btn').disabled = true;
-        setTimeout(() => window.location.href = 'index.php', 1500);
-      } else {
+  regSuccess.classList.remove('hidden');
+
+  if (json.typeCompte === 'pro') {
+    regSuccess.querySelector('span').textContent =
+      "Compte créé ! Une notification vous explique comment finaliser la vérification professionnelle.";
+  } else {
+    regSuccess.querySelector('span').textContent =
+      "Compte créé ! Redirection en cours…";
+  }
+
+  document.getElementById('reg-btn').disabled = true;
+
+  setTimeout(() => {
+    window.location.href = 'index.php';
+  }, 1500);
+}else {
         regAlertText.textContent = json.message || 'Erreur serveur';
         regAlert.classList.remove('hidden');
       }

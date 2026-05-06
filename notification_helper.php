@@ -69,7 +69,7 @@ function creerNotification($conn, $idUser, $contenu, $type = 'info', $lien = nul
     $sql = "INSERT INTO Notification 
             (idNotification, contenu, typeNoti, dateNoti, statutLecture, idUtilisateur) 
             VALUES 
-            ('$idNotif', '$contenuE', '$typeE', CURDATE(), 0, '$idUserE')";
+            ('$idNotif', '$contenuE', '$typeE', NOW(), 0, '$idUserE')";
     
     if (mysqli_query($conn, $sql)) {
         return $idNotif;

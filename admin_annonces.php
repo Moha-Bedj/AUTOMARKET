@@ -1,10 +1,57 @@
-
-
 <?php
 session_start();
 require_once 'auth_admin.php';
 require_once 'connexion.php';
 
+/* =========================
+   ACTIONS DES BOUTONS
+========================= */
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $idAnnonce = $_POST['idAnnonce'] ?? '';
+    $action = $_POST['action'] ?? '';
+
+    if (!empty($idAnnonce) && !empty($action)) {
+
+        if ($action === 'valider') {
+            $stmt = mysqli_prepare($conn, "UPDATE Annonce SET statutAnnonce = 'active', dateModification = CURDATE() WHERE idAnnonce = ?");
+            mysqli_stmt_bind_param($stmt, "s", $idAnnonce);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
+
+            $_SESSION['message_admin'] = "Annonce validée avec succès.";
+        }
+
+        if ($action === 'refuser') {
+            $stmt = mysqli_prepare($conn, "UPDATE Annonce SET statutAnnonce = 'refusee', dateModification = CURDATE() WHERE idAnnonce = ?");
+            mysqli_stmt_bind_param($stmt, "s", $idAnnonce);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
+
+            $_SESSION['message_admin'] = "Annonce refusée avec succès.";
+        }
+
+        if ($action === 'supprimer') {
+            /*
+              Normalement, si tes clés étrangères sont bien en ON DELETE CASCADE,
+              les photos, statistiques, favoris, signalements liés seront supprimés automatiquement.
+            */
+            $stmt = mysqli_prepare($conn, "DELETE FROM Annonce WHERE idAnnonce = ?");
+            mysqli_stmt_bind_param($stmt, "s", $idAnnonce);
+            mysqli_stmt_execute($stmt);
+            mysqli_stmt_close($stmt);
+
+            $_SESSION['message_admin'] = "Annonce supprimée avec succès.";
+        }
+    }
+
+    header("Location: admin_annonces.php");
+    exit;
+}
+
+/* =========================
+   RÉCUPÉRATION DES ANNONCES
+========================= */
 $sql = "
 SELECT a.idAnnonce, a.titre, a.prix, a.localisation, a.statutAnnonce, a.datePublication,
        v.annee, v.kilometrage, v.carburant,
@@ -48,7 +95,6 @@ body {
   padding:24px 18px;
   color:white
 }
-
 
 .logo {
   display: flex;
@@ -166,6 +212,7 @@ body {
 .actions {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .btn {
@@ -174,6 +221,10 @@ body {
   border-radius: 7px;
   cursor: pointer;
   font-size: 12px;
+}
+
+.btn:hover {
+  opacity: .85;
 }
 
 .btn-view {
@@ -194,6 +245,20 @@ body {
 .btn-delete {
   background: #eee;
   color: #444;
+}
+
+.action-form {
+  display: inline;
+}
+
+.alert {
+  background: #EAF3DE;
+  color: #27500A;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  border: 1px solid rgba(39,80,10,.2);
 }
 </style>
 </head>
@@ -228,6 +293,13 @@ body {
       </div>
     </div>
 
+    <?php if (!empty($_SESSION['message_admin'])): ?>
+      <div class="alert">
+        <?= htmlspecialchars($_SESSION['message_admin']) ?>
+      </div>
+      <?php unset($_SESSION['message_admin']); ?>
+    <?php endif; ?>
+
     <div class="card">
       <table class="table" id="annoncesTable">
         <thead>
@@ -247,11 +319,11 @@ body {
         <?php if ($res && mysqli_num_rows($res) > 0): ?>
           <?php while ($a = mysqli_fetch_assoc($res)): ?>
             <?php
-              $statut = strtolower($a['statutAnnonce']);
+              $statut = strtolower($a['statutAnnonce'] ?? 'en_attente');
               $statutClass = str_replace(' ', '_', $statut);
             ?>
             <tr>
-              <td><?= $a['idAnnonce'] ?></td>
+              <td><?= htmlspecialchars($a['idAnnonce']) ?></td>
 
               <td>
                 <div class="title"><?= htmlspecialchars($a['titre']) ?></div>
@@ -271,17 +343,38 @@ body {
               <td><?= htmlspecialchars($a['localisation']) ?></td>
 
               <td>
-                <span class="status <?= $statutClass ?>">
+                <span class="status <?= htmlspecialchars($statutClass) ?>">
                   <?= htmlspecialchars($a['statutAnnonce']) ?>
                 </span>
               </td>
 
               <td>
                 <div class="actions">
-                  <button class="btn btn-view" onclick="location.href='fiche_annonce.php?id=<?= $a['idAnnonce'] ?>'">Voir</button>
-                  <button class="btn btn-approve">Valider</button>
-                  <button class="btn btn-refuse">Refuser</button>
-                  <button class="btn btn-delete">Suppr.</button>
+
+                  <button 
+                    class="btn btn-view" 
+                    onclick="location.href='ficheAnnonces.php?id=<?= urlencode($a['idAnnonce']) ?>'">
+                    Voir
+                  </button>
+
+                  <form method="POST" class="action-form" onsubmit="return confirm('Voulez-vous valider cette annonce ?');">
+                    <input type="hidden" name="idAnnonce" value="<?= htmlspecialchars($a['idAnnonce']) ?>">
+                    <input type="hidden" name="action" value="valider">
+                    <button type="submit" class="btn btn-approve">Valider</button>
+                  </form>
+
+                  <form method="POST" class="action-form" onsubmit="return confirm('Voulez-vous refuser cette annonce ?');">
+                    <input type="hidden" name="idAnnonce" value="<?= htmlspecialchars($a['idAnnonce']) ?>">
+                    <input type="hidden" name="action" value="refuser">
+                    <button type="submit" class="btn btn-refuse">Refuser</button>
+                  </form>
+
+                  <form method="POST" class="action-form" onsubmit="return confirm('Voulez-vous vraiment supprimer cette annonce ? Cette action est définitive.');">
+                    <input type="hidden" name="idAnnonce" value="<?= htmlspecialchars($a['idAnnonce']) ?>">
+                    <input type="hidden" name="action" value="supprimer">
+                    <button type="submit" class="btn btn-delete">Suppr.</button>
+                  </form>
+
                 </div>
               </td>
             </tr>

@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'connexion.php';
+require_once 'doublons.php';
 
 if (!isset($_SESSION['idUtilisateur'])) {
     header("Location: connexion.php?redirect=publier.php");
@@ -10,6 +11,40 @@ $idUser = $_SESSION['idUtilisateur'];
 $idUserSql = mysqli_real_escape_string($conn, $idUser);
 $rUser = mysqli_query($conn, "SELECT nom, prenom, numTel FROM Utilisateur WHERE idUtilisateur = '$idUserSql'");
 $user = mysqli_fetch_assoc($rUser) ?: ['nom'=>'', 'prenom'=>'', 'numTel'=>''];
+$marquesDB = [];
+
+$sqlMarques = "
+SELECT 
+  ma.nomMarque,
+  mo.nomModele,
+  ve.nomVersion
+FROM Marque ma
+LEFT JOIN Modele mo ON mo.idMarque = ma.idMarque
+LEFT JOIN Version ve ON ve.idModele = mo.idModele
+ORDER BY ma.nomMarque, mo.nomModele, ve.nomVersion
+";
+
+$resMarques = mysqli_query($conn, $sqlMarques);
+
+if ($resMarques) {
+    while ($row = mysqli_fetch_assoc($resMarques)) {
+        $marque = $row['nomMarque'];
+        $modele = $row['nomModele'];
+        $version = $row['nomVersion'];
+
+        if (!isset($marquesDB[$marque])) {
+            $marquesDB[$marque] = [];
+        }
+
+        if ($modele && !isset($marquesDB[$marque][$modele])) {
+            $marquesDB[$marque][$modele] = [];
+        }
+
+        if ($modele && $version) {
+            $marquesDB[$marque][$modele][] = $version;
+        }
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'publier') {
 
@@ -19,6 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $marque      = trim($_POST['marque'] ?? '');
     $modele      = trim($_POST['modele'] ?? '');
     $version     = trim($_POST['version'] ?? '');
+    $vin = trim($_POST['vin'] ?? '');
+    $immatriculation = trim($_POST['immatriculation'] ?? '');
     $annee       = (int)($_POST['annee'] ?? 0);
     $km          = (int)($_POST['kilometrage'] ?? 0);
     $carburant   = mysqli_real_escape_string($conn, $_POST['carburant'] ?? '');
@@ -39,12 +76,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $echange     = isset($_POST['echange']) ? 1 : 0;
     $telephone   = trim($_POST['telephone'] ?? '');
     $equipements = $_POST['equipements'] ?? [];
+    $vin = strtoupper(trim($_POST['vin'] ?? ''));
+$immatriculation = strtoupper(trim($_POST['immatriculation'] ?? ''));
+
+$vinE = mysqli_real_escape_string($conn, $vin);
+$immatE = mysqli_real_escape_string($conn, $immatriculation);
 
     $errors = [];
     if (!$titre || strlen($titre) < 10) $errors[] = "Le titre doit contenir au moins 10 caracteres.";
     if (!$description || strlen($description) < 50) $errors[] = "La description doit contenir au moins 50 caracteres.";
     if (!$marque) $errors[] = "Marque obligatoire.";
     if (!$modele) $errors[] = "Modele obligatoire.";
+    if (!$vin) $errors[] = "VIN obligatoire.";
+if (!$immatriculation) $errors[] = "Immatriculation obligatoire.";
     if ($annee < 1900 || $annee > 2030) $errors[] = "Annee invalide.";
     if ($prix <= 0) $errors[] = "Prix invalide.";
     if (!$localisation) $errors[] = "Wilaya obligatoire.";
@@ -75,6 +119,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $couleurFull = $couleurExt . ($couleurInt ? " / int. $couleurInt" : '');
     $couleurFullE = mysqli_real_escape_string($conn, $couleurFull);
     $descriptionE = mysqli_real_escape_string($conn, $description);
+  $checkDoublon = mysqli_query($conn, "
+    SELECT a.idAnnonce
+    FROM Annonce a
+    INNER JOIN Vehicule v ON v.idVehicule = a.idVehicule
+    WHERE a.statutAnnonce != 'supprimee'
+    AND (
+        (v.vin IS NOT NULL AND v.vin != '' AND v.vin = '$vinE')
+        OR
+        (v.immatriculation IS NOT NULL AND v.immatriculation != '' AND v.immatriculation = '$immatE')
+    )
+    LIMIT 1
+");
+
+if ($checkDoublon && mysqli_num_rows($checkDoublon) > 0) {
+    echo json_encode([
+        'success' => false,
+        'errors' => ['Ce véhicule semble déjà publié. L’annonce doit être vérifiée par un administrateur.']
+    ]);
+    exit;
+}
 
     mysqli_begin_transaction($conn);
 
@@ -118,7 +182,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         /* === INSERT Vehicule avec idModele réel === */
         $idVersionSql = $idVersion ? "'$idVersion'" : 'NULL';
-        $sqlV = "INSERT INTO Vehicule (idVehicule, idVersion, idModele, typeVehicule, annee, kilometrage, carburant, transmission, puissance, couleur, nbrPortes, nbrPlaces, etatVehicule, cylindree) VALUES ('$idVehicule', $idVersionSql, '$idModele', '$type', $annee, $km, '$carburant', '$transmission', " . ($puissance ?: 'NULL') . ", '$couleurFullE', " . ($portes ?: 'NULL') . ", " . ($places ?: 'NULL') . ", '$etat', " . ($cylindree ?: 'NULL') . ")";
+       $sqlV = "INSERT INTO Vehicule 
+(idVehicule, idVersion, idModele, typeVehicule, vin, immatriculation, annee, kilometrage, carburant, transmission, puissance, couleur, nbrPortes, nbrPlaces, etatVehicule, cylindree) 
+VALUES 
+('$idVehicule', $idVersionSql, '$idModele', '$type', '$vinE', '$immatE', $annee, $km, '$carburant', '$transmission', " . ($puissance ?: 'NULL') . ", '$couleurFullE', " . ($portes ?: 'NULL') . ", " . ($places ?: 'NULL') . ", '$etat', " . ($cylindree ?: 'NULL') . ")";
         if (!mysqli_query($conn, $sqlV)) throw new Exception("Erreur Vehicule : " . mysqli_error($conn));
 
         $today = date('Y-m-d');
@@ -140,8 +207,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 throw new Exception("Erreur creation Vendeur : " . mysqli_error($conn));
             }
         }
+        $scoreDoublon = 0;
+$motifModeration = '';
+$statutAnnonce = 'active';
 
-        $sqlA = "INSERT INTO Annonce (idAnnonce, idVehicule, idVendeur, titre, description, prix, datePublication, dateExpiration, statutAnnonce, typeAnnonce, localisation, vendeurVerif) VALUES ('$idAnnonce', '$idVehicule', '$idUserSql', '$titreFinalE', '$descriptionE', $prix, '$today', '$expir', 'active', 'vente', '$localisation', 0)";
+$vinE = mysqli_real_escape_string($conn, $vin);
+$immatE = mysqli_real_escape_string($conn, $immatriculation);
+
+if ($vinE !== '') {
+    $checkVin = mysqli_query($conn, "
+        SELECT a.idAnnonce
+        FROM Annonce a
+        JOIN Vehicule v ON a.idVehicule = v.idVehicule
+        WHERE v.vin = '$vinE'
+        AND a.statutAnnonce != 'supprimee'
+        LIMIT 1
+    ");
+
+    if ($checkVin && mysqli_num_rows($checkVin) > 0) {
+        $scoreDoublon += 80;
+        $motifModeration .= 'VIN identique. ';
+    }
+}
+
+if ($immatE !== '') {
+    $checkImmat = mysqli_query($conn, "
+        SELECT a.idAnnonce
+        FROM Annonce a
+        JOIN Vehicule v ON a.idVehicule = v.idVehicule
+        WHERE v.immatriculation = '$immatE'
+        AND a.statutAnnonce != 'supprimee'
+        LIMIT 1
+    ");
+
+    if ($checkImmat && mysqli_num_rows($checkImmat) > 0) {
+        $scoreDoublon += 70;
+        $motifModeration .= 'Immatriculation identique. ';
+    }
+}
+
+if ($scoreDoublon >= 70) {
+    $statutAnnonce = 'en_attente';
+}
+
+        $motifModerationE = mysqli_real_escape_string($conn, $motifModeration);
+
+$sqlA = "INSERT INTO Annonce 
+(idAnnonce, idVehicule, idVendeur, titre, description, prix, datePublication, dateExpiration, statutAnnonce, typeAnnonce, localisation, vendeurVerif, scoreDoublon, motifModeration) 
+VALUES 
+('$idAnnonce', '$idVehicule', '$idUserSql', '$titreFinalE', '$descriptionE', $prix, '$today', '$expir', '$statutAnnonce', 'vente', '$localisation', 0, $scoreDoublon, '$motifModerationE')";
         if (!mysqli_query($conn, $sqlA)) throw new Exception("Erreur Annonce : " . mysqli_error($conn));
 
         /* Incrémenter compteur d'annonces actives du vendeur */
@@ -558,16 +672,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             </div>
             <div class="field">
               <label class="field-label">Modèle <span class="req">*</span></label>
-              <select class="field-select" name="modele" id="f-modele" onchange="checkFilled(this)">
-                <option value="">Choisir...</option>
+              <select class="field-select" name="modele" id="f-modele" onchange="updateVersions(); checkFilled(this)">
               </select>
             </div>
             <div class="field">
-              <label class="field-label">Version</label>
-              <input class="field-input" type="text" name="version" placeholder="Ex: GT Line" oninput="checkFilled(this)">
+              <label class="field-label">Version</label> 
+              <input class="field-input" type="text" name="version" list="versions-list" placeholder="Choisir ou écrire une version" oninput="checkFilled(this)">
+              <datalist id="versions-list">
+              </datalist>
             </div>
           </div>
         </div>
+        <div class="grid-2">
+  <div class="field">
+    <label class="field-label">VIN / Numéro de châssis</label>
+    <input class="field-input" type="text" name="vin" placeholder="Ex: VF3XXXXXXXXXXXXXX">
+  </div>
+
+  <div class="field">
+    <label class="field-label">Immatriculation</label>
+    <input class="field-input" type="text" name="immatriculation" placeholder="Ex: 12345-113-16">
+  </div>
+</div>
 
         <div class="form-card">
           <div class="form-card-h">
@@ -1011,48 +1137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     /* ============================================ */
     /* ===   DONNÉES MARQUES / MODÈLES          === */
     /* ============================================ */
-    const MARQUES = {
-      voiture: {
-        Toyota:['Corolla','Yaris','Camry','RAV4','Hilux','Land Cruiser','Auris','Avensis','C-HR','Prius'],
-        Hyundai:['Tucson','Elantra','Santa Fe','i10','i20','i30','Creta','Accent','Kona','Sonata'],
-        Renault:['Clio','Megane','Duster','Kadjar','Logan','Talisman','Symbol','Captur','Express','Trafic'],
-        Peugeot:['208','308','3008','5008','Partner','Rifter','2008','508','Expert','Boxer'],
-        Volkswagen:['Golf','Polo','Passat','Tiguan','T-Roc','Caddy','Touareg','Jetta','Amarok'],
-        BMW:['Série 1','Série 2','Série 3','Série 5','Série 7','X1','X2','X3','X5','X6','X7'],
-        Mercedes:['Classe A','Classe G','Classe B','Classe C','Classe E','Classe S','GLA','GLC','GLE','GLS','Vito','Sprinter'],
-        Kia:['Sportage','Cerato','Picanto','Sorento','Rio','Stonic','Carnival','Optima'],
-        Dacia:['Duster','Logan','Sandero','Dokker','Lodgy','Stepway','Spring'],
-        Ford:['Focus','Fiesta','Kuga','Puma','Ranger','Mondeo','EcoSport','Transit'],
-        Suzuki:['Swift','Vitara','Jimny','S-Cross','Baleno','Celerio'],
-        Mitsubishi:['Pajero','L200','ASX','Outlander','Eclipse Cross','Lancer'],
-        Nissan:['Qashqai','Juke','Micra','X-Trail','Patrol','Navara','Sunny'],
-        Skoda:['Octavia','Fabia','Kodiaq','Karoq','Superb','Scala'],
-        Citroën:['C3','C4','C5','Berlingo','C-Elysée','C5 Aircross','Jumper'],
-        Fiat:['Tipo','500','Panda','Doblo','Punto','Ducato'],
-        Seat:['Ibiza','Leon','Ateca','Arona','Tarraco'],
-        Audi:['A1','A3','A4','A5','A6','A7','A8','Q2','Q3','Q5','Q7','Q8'],
-        Chery:['Tiggo 4','Tiggo 7','Tiggo 8','Arrizo 5','Arrizo 6'],
-        Geely:['Coolray','Emgrand','Atlas','Tugella'],
-      },
-      moto: {
-        Honda:['CB500','CBR600','Africa Twin','Forza 300','PCX','MSX 125','CB125','CRF250'],
-        Yamaha:['MT-07','MT-09','YZF-R3','TMAX','XMAX','MT-03','YZF-R1','XSR700'],
-        Kawasaki:['Z650','Ninja 400','Z900','Versys','Z1000','Vulcan'],
-        KTM:['Duke 390','Duke 790','Adventure 390','RC 200','Duke 125','SX-F'],
-        Suzuki:['GSX-R 600','V-Strom','GSX-S 750','Hayabusa','Burgman'],
-        BMW:['R 1250 GS','S 1000 RR','F 850 GS','R nineT','G 310'],
-        Ducati:['Monster','Panigale V4','Multistrada','Scrambler'],
-      },
-      camion: {
-        Mercedes:['Actros','Axor','Atego','Sprinter','Vario','Antos','Arocs'],
-        Volvo:['FH','FM','FMX','FE','FL'],
-        MAN:['TGX','TGS','TGM','TGL','TGE'],
-        Scania:['R Series','S Series','P Series','G Series'],
-        Iveco:['Daily','Eurocargo','Stralis','S-Way'],
-        Renault:['Master','T-Series','C-Series','D-Series','K-Series'],
-        DAF:['XF','CF','LF','XG'],
-      }
-    };
+   const MARQUES_DB = <?= json_encode($marquesDB, JSON_UNESCAPED_UNICODE); ?>;
 
     /* ============================================ */
     /* ===   ÉTAT GLOBAL                         === */
@@ -1179,39 +1264,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     /* ===   ÉTAPE 2 : MARQUES / MODÈLES         === */
     /* ============================================ */
     function buildMarques() {
-      const type = document.getElementById('f-type').value;
-      const sel = document.getElementById('f-marque');
-      sel.innerHTML = '<option value="">Choisir...</option>';
-      Object.keys(MARQUES[type] || {}).sort().forEach(m => {
-        const o = document.createElement('option');
-        o.value = m; o.textContent = m;
-        sel.appendChild(o);
-      });
-      const optAutre = document.createElement('option');
-      optAutre.value = 'Autre'; optAutre.textContent = 'Autre...';
-      sel.appendChild(optAutre);
+  const sel = document.getElementById('f-marque');
+  sel.innerHTML = '<option value="">Choisir...</option>';
 
-      document.getElementById('f-modele').innerHTML = '<option value="">Choisir...</option>';
-    }
+  Object.keys(MARQUES_DB).sort().forEach(marque => {
+    const o = document.createElement('option');
+    o.value = marque;
+    o.textContent = marque;
+    sel.appendChild(o);
+  });
 
-    function updateModeles() {
-      const type = document.getElementById('f-type').value;
-      const marque = document.getElementById('f-marque').value;
-      const sel = document.getElementById('f-modele');
-      sel.innerHTML = '<option value="">Choisir...</option>';
-      const list = (MARQUES[type] || {})[marque];
-      if (list) {
-        list.forEach(m => {
-          const o = document.createElement('option');
-          o.value = m; o.textContent = m;
-          sel.appendChild(o);
-        });
-      }
-      const optAutre = document.createElement('option');
-      optAutre.value = 'Autre'; optAutre.textContent = 'Autre...';
-      sel.appendChild(optAutre);
-    }
+  document.getElementById('f-modele').innerHTML = '<option value="">Choisir...</option>';
 
+  const versionInput = document.querySelector('[name="version"]');
+  if (versionInput) {
+    versionInput.value = '';
+    versionInput.setAttribute('list', 'versions-list');
+  }
+}
+
+function updateModeles() {
+  const marque = document.getElementById('f-marque').value;
+  const selModele = document.getElementById('f-modele');
+
+  selModele.innerHTML = '<option value="">Choisir...</option>';
+
+  if (!MARQUES_DB[marque]) return;
+
+  Object.keys(MARQUES_DB[marque]).sort().forEach(modele => {
+    const o = document.createElement('option');
+    o.value = modele;
+    o.textContent = modele;
+    selModele.appendChild(o);
+  });
+}
+
+function updateVersions() {
+  const marque = document.getElementById('f-marque').value;
+  const modele = document.getElementById('f-modele').value;
+  const versionInput = document.querySelector('[name="version"]');
+  const list = document.getElementById('versions-list');
+
+  versionInput.value = '';
+  list.innerHTML = '';
+
+  const versions = MARQUES_DB[marque]?.[modele] || [];
+
+  versions.forEach(version => {
+    const opt = document.createElement('option');
+    opt.value = version;
+    list.appendChild(opt);
+  });
+}
     /* ============================================ */
     /* ===   FIELD INDICATORS                    === */
     /* ============================================ */

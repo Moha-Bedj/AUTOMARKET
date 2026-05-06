@@ -4,11 +4,15 @@ session_start();
 require_once 'auth_admin.php';
 require_once 'connexion.php';
 
-/* À adapter plus tard avec rôle admin */
+/* Vérifier connexion admin */
 if (!isset($_SESSION['idUtilisateur'])) {
     header("Location: inscription.php");
     exit;
 }
+
+/* =========================
+   STATISTIQUES DASHBOARD
+========================= */
 
 $totalAnnonces = mysqli_fetch_assoc(mysqli_query($conn, "
     SELECT COUNT(*) total FROM Annonce
@@ -28,6 +32,16 @@ $totalUsers = mysqli_fetch_assoc(mysqli_query($conn, "
 
 $vendeursVerifies = mysqli_fetch_assoc(mysqli_query($conn, "
     SELECT COUNT(*) total FROM Utilisateur WHERE badgeVerifie=1
+"))['total'] ?? 0;
+
+$demandesProAttente = mysqli_fetch_assoc(mysqli_query($conn, "
+    SELECT COUNT(*) total 
+    FROM Concessionnaire 
+    WHERE statutPro IN ('en_attente_verification', 'en_attente_admin')"))['total'] ?? 0;
+
+$demandesProTotal = mysqli_fetch_assoc(mysqli_query($conn, "
+    SELECT COUNT(*) total 
+    FROM Concessionnaire
 "))['total'] ?? 0;
 ?>
 
@@ -56,18 +70,17 @@ body {
   min-height: 100vh;
 }
 
-.sidebar{
-  width:250px;
-  background:#0C447C;
-  padding:24px 18px;
-  color:white
+.sidebar {
+  width: 250px;
+  background: #0C447C;
+  padding: 24px 18px;
+  color: white;
 }
-
 
 .logo {
   display: flex;
   align-items: center;
-  justify-content: center; /* 👈 bien à gauche */
+  justify-content: center;
   margin-bottom: 30px;
 }
 
@@ -115,9 +128,15 @@ body {
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 18px;
   margin-bottom: 30px;
+}
+
+.card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
 }
 
 .card {
@@ -126,6 +145,19 @@ body {
   padding: 20px;
   border: 1px solid rgba(0,0,0,.1);
   box-shadow: 0 6px 18px rgba(0,0,0,.06);
+  transition: 0.15s;
+  min-height: 110px;
+}
+
+.card-link:hover .card {
+  border-color: #185FA5;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0,0,0,.08);
+}
+
+.card.warning {
+  background: #FAEEDA;
+  border-color: #FAC775;
 }
 
 .card-title {
@@ -138,6 +170,10 @@ body {
   font-size: 30px;
   font-weight: bold;
   color: #185FA5;
+}
+
+.card.warning .card-number {
+  color: #BA7517;
 }
 
 .section {
@@ -171,13 +207,23 @@ body {
   background: #0C447C;
 }
 
-@media(max-width: 1000px) {
-  .cards {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.quick-actions a.warning-action {
+  background: #BA7517;
+}
 
+.quick-actions a.warning-action:hover {
+  background: #854F0B;
+}
+
+@media(max-width: 1200px) {
+  .cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media(max-width: 1000px) {
   .sidebar {
-    width: 200px;
+    width: 220px;
   }
 }
 
@@ -193,6 +239,12 @@ body {
   .cards {
     grid-template-columns: 1fr;
   }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 </style>
 </head>
@@ -201,58 +253,69 @@ body {
 
 <div class="admin-layout">
 
- <aside class="sidebar">
+  <aside class="sidebar">
 
-  <div class="logo">
-    <img src="images/logo.png" alt="AUTOMARKET">
-  </div>
+    <div class="logo">
+      <img src="images/logo.png" alt="AUTOMARKET">
+    </div>
 
-  <nav class="menu">
-    <a href="admin_dashboard.php" class="active">Tableau de bord</a>
-    <a href="admin_annonces.php">Annonces</a>
-    <a href="admin_utilisateurs.php">Utilisateurs</a>
-    <a href="admin_marques.php">Marques / Modèles</a>
-    <a href="admin_equipements.php">Équipements</a>
-    <a href="admin_signalements.php">Signalements</a>
-    <a href="index.php">Retour au site</a>
-  </nav>
+    <nav class="menu">
+      <a href="admin_dashboard.php" class="active">Tableau de bord</a>
+      <a href="admin_annonces.php">Annonces</a>
+      <a href="admin_utilisateurs.php">Utilisateurs</a>
+      <a href="admin_demandes_pro.php">Demandes Pro</a>
+      <a href="admin_marques.php">Marques / Modèles</a>
+      <a href="admin_equipements.php">Équipements</a>
+      <a href="admin_signalements.php">Signalements</a>
+      <a href="index.php">Retour au site</a>
+    </nav>
 
-</aside>
+  </aside>
 
   <main class="main">
 
     <div class="header">
       <h1>Tableau de bord</h1>
+
       <div class="admin-name">
         Connecté : <?= htmlspecialchars($_SESSION['prenom'] ?? 'Admin') ?>
       </div>
     </div>
 
     <div class="cards">
+
       <div class="card">
         <div class="card-title">Total annonces</div>
-        <div class="card-number"><?= $totalAnnonces ?></div>
+        <div class="card-number"><?= intval($totalAnnonces) ?></div>
       </div>
 
       <div class="card">
         <div class="card-title">Annonces actives</div>
-        <div class="card-number"><?= $annoncesActives ?></div>
+        <div class="card-number"><?= intval($annoncesActives) ?></div>
       </div>
 
       <div class="card">
-        <div class="card-title">En attente</div>
-        <div class="card-number"><?= $annoncesAttente ?></div>
+        <div class="card-title">Annonces en attente</div>
+        <div class="card-number"><?= intval($annoncesAttente) ?></div>
       </div>
+
+      <a href="admin_demandes_pro.php" class="card-link">
+        <div class="card warning">
+          <div class="card-title">Demandes Pro</div>
+          <div class="card-number"><?= intval($demandesProAttente) ?></div>
+        </div>
+      </a>
 
       <div class="card">
         <div class="card-title">Utilisateurs</div>
-        <div class="card-number"><?= $totalUsers ?></div>
+        <div class="card-number"><?= intval($totalUsers) ?></div>
       </div>
 
       <div class="card">
         <div class="card-title">Vendeurs vérifiés</div>
-        <div class="card-number"><?= $vendeursVerifies ?></div>
+        <div class="card-number"><?= intval($vendeursVerifies) ?></div>
       </div>
+
     </div>
 
     <div class="section">
@@ -261,6 +324,7 @@ body {
       <div class="quick-actions">
         <a href="admin_annonces.php">Gérer les annonces</a>
         <a href="admin_utilisateurs.php">Gérer les utilisateurs</a>
+        <a href="admin_demandes_pro.php" class="warning-action">Valider comptes Pro</a>
         <a href="admin_marques.php">Ajouter marque / modèle</a>
         <a href="admin_signalements.php">Voir signalements</a>
       </div>
