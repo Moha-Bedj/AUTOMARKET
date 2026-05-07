@@ -648,7 +648,7 @@ $totalFavoris = mysqli_num_rows($result);
                 </div>
                 <div style="display:flex; align-items:center; gap:12px;">
                   <div class="ldate"><?= $dl ?></div>
-                  <a href="retirer_favori.php?id=<?= urlencode($a['idAnnonce']) ?>" class="remove-link">Retirer</a>
+                  <a href="#" class="remove-link" onclick="removeFavori('<?= urlencode($a['idAnnonce']) ?>', this.closest('.lcard')); return false;">Retirer</a>
                 </div>
               </div>
             </div>
@@ -677,6 +677,33 @@ $totalFavoris = mysqli_num_rows($result);
         if (d) d.style.display = 'none';
       }
     });
+
+    function removeFavori(id, card) {
+    if (!confirm('Retirer cette annonce de vos favoris ?')) return;
+    
+    // Animate out
+    card.style.transition = 'opacity 0.3s, transform 0.3s';
+    card.style.opacity = '0';
+    card.style.transform = 'translateX(30px)';
+    
+    // Call the PHP script to remove from database
+    fetch('retirer_favori.php?id=' + encodeURIComponent(id))
+        .then(() => {
+            setTimeout(() => {
+                card.remove();
+                // Update counter and check if list is empty
+                const remaining = document.querySelectorAll('.lcard').length;
+                if (remaining === 0) {
+                    location.reload();
+                }
+            }, 300);
+        })
+        .catch(() => {
+            // Fallback: redirect to the PHP page
+            window.location.href = 'retirer_favori.php?id=' + encodeURIComponent(id);
+        });
+}
   </script>
+  
 </body>
 </html>
