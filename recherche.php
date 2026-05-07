@@ -4,25 +4,33 @@ require_once 'connexion.php';
 
 /* CAPTURE DES FILTRES */
 $f = [
-    'q'         => trim($_GET['q'] ?? ''),
-    'type'      => $_GET['type'] ?? '',
-    'marque'    => $_GET['marque'] ?? '',
-    'modele'    => $_GET['modele'] ?? '',
-    'annee_min' => $_GET['annee_min'] ?? '',
-    'annee_max' => $_GET['annee_max'] ?? '',
-    'prix_min'  => $_GET['prix_min'] ?? '',
-    'prix_max'  => $_GET['prix_max'] ?? '',
-    'km_min'    => $_GET['km_min'] ?? '',
-    'km_max'    => $_GET['km_max'] ?? '',
-    'carburant' => $_GET['carburant'] ?? [],
-    'transmis'  => $_GET['transmis'] ?? '',
-    'couleur'   => $_GET['couleur'] ?? '',
-    'wilaya'    => $_GET['wilaya'] ?? '',
-    'verifie'   => isset($_GET['verifie']),
-    'sort'      => $_GET['sort'] ?? 'date_desc',
-    'page'      => max(1, (int)($_GET['page'] ?? 1)),
+    'q'           => trim($_GET['q'] ?? ''),
+    'typeAnnonce' => $_GET['typeAnnonce'] ?? '',
+    'type'        => $_GET['type'] ?? '',
+    'marque'      => $_GET['marque'] ?? '',
+    'modele'      => $_GET['modele'] ?? '',
+    'annee_min'   => $_GET['annee_min'] ?? '',
+    'annee_max'   => $_GET['annee_max'] ?? '',
+    'prix_min'    => $_GET['prix_min'] ?? '',
+    'prix_max'    => $_GET['prix_max'] ?? '',
+    'km_min'      => $_GET['km_min'] ?? '',
+    'km_max'      => $_GET['km_max'] ?? '',
+    'carburant'   => $_GET['carburant'] ?? [],
+    'transmis'    => $_GET['transmis'] ?? '',
+    'couleur'     => $_GET['couleur'] ?? '',
+    'wilaya'      => $_GET['wilaya'] ?? '',
+    'verifie'     => isset($_GET['verifie']),
+    'sort'        => $_GET['sort'] ?? 'date_desc',
+    'page'        => max(1, (int)($_GET['page'] ?? 1)),
 ];
-if (is_string($f['carburant'])) $f['carburant'] = $f['carburant'] ? [$f['carburant']] : [];
+
+if (is_string($f['carburant'])) {
+    $f['carburant'] = $f['carburant'] ? [$f['carburant']] : [];
+}
+
+if (!in_array($f['typeAnnonce'], ['vente', 'location'])) {
+    $f['typeAnnonce'] = '';
+}
 
 $perPage = 20;
 $offset = ($f['page'] - 1) * $perPage;
@@ -31,10 +39,15 @@ $offset = ($f['page'] - 1) * $perPage;
 $conditions = ["a.statutAnnonce = 'active'"];
 $esc = fn($v) => mysqli_real_escape_string($conn, $v);
 
+if ($f['typeAnnonce']) {
+    $conditions[] = "a.typeAnnonce = '" . $esc($f['typeAnnonce']) . "'";
+}
+
 if ($f['q']) {
     $q = $esc($f['q']);
     $conditions[] = "(a.titre LIKE '%$q%' OR a.description LIKE '%$q%' OR m.nomMarque LIKE '%$q%' OR mo.nomModele LIKE '%$q%')";
 }
+
 if ($f['type'])      $conditions[] = "v.typeVehicule = '" . $esc($f['type']) . "'";
 if ($f['marque'])    $conditions[] = "m.nomMarque = '" . $esc($f['marque']) . "'";
 if ($f['modele'])    $conditions[] = "mo.nomModele = '" . $esc($f['modele']) . "'";
@@ -44,10 +57,12 @@ if ($f['prix_min'])  $conditions[] = "a.prix >= " . (float)$f['prix_min'];
 if ($f['prix_max'])  $conditions[] = "a.prix <= " . (float)$f['prix_max'];
 if ($f['km_min'])    $conditions[] = "v.kilometrage >= " . (int)$f['km_min'];
 if ($f['km_max'])    $conditions[] = "v.kilometrage <= " . (int)$f['km_max'];
+
 if (!empty($f['carburant'])) {
     $list = array_map(fn($c) => "'" . $esc($c) . "'", $f['carburant']);
     $conditions[] = "v.carburant IN (" . implode(',', $list) . ")";
 }
+
 if ($f['transmis'])  $conditions[] = "v.transmission = '" . $esc($f['transmis']) . "'";
 if ($f['couleur'])   $conditions[] = "v.couleur LIKE '%" . $esc($f['couleur']) . "%'";
 if ($f['wilaya'])    $conditions[] = "a.localisation LIKE '%" . $esc($f['wilaya']) . "%'";
@@ -67,8 +82,8 @@ $sqlBase = "
     FROM Annonce a
     LEFT JOIN Vehicule v ON a.idVehicule = v.idVehicule
     LEFT JOIN Utilisateur u ON a.idVendeur = u.idUtilisateur
-    LEFT JOIN Modele mo ON v.idModele = mo.idModele
-    LEFT JOIN Marque m ON mo.idMarque = m.idMarque
+    LEFT JOIN modele mo ON v.idModele = mo.idModele
+    LEFT JOIN marque m ON mo.idMarque = m.idMarque
     LEFT JOIN Vendeur ven ON ven.idUtilisateur = u.idUtilisateur
     WHERE $where
 ";
@@ -82,12 +97,12 @@ $prixMoyen = $rAvg ? (int)(mysqli_fetch_assoc($rAvg)['moy'] ?? 0) : 0;
 
 $sql = "
     SELECT 
-        a.idAnnonce, a.titre, a.prix, a.localisation, a.datePublication,
-        a.vendeurVerif, a.idVendeur,
+        a.idAnnonce, a.titre, a.description, a.prix, a.localisation, a.datePublication,
+        a.vendeurVerif, a.idVendeur, a.typeAnnonce,
         v.typeVehicule, v.annee, v.kilometrage, v.carburant,
         v.transmission, v.puissance, v.couleur, v.etatVehicule,
         u.nom AS vendeur_nom, u.prenom AS vendeur_prenom, u.badgeVerifie,
-        m.nomMarque, mo.nomModele,
+        m.nomMarque, mo.nomModele, mo.idModele,
         ven.typeVendeur,
         (SELECT urlPhoto FROM Photos WHERE idAnnonce = a.idAnnonce ORDER BY ordrePhoto ASC LIMIT 1) AS photo,
         (SELECT COUNT(*) FROM Photos WHERE idAnnonce = a.idAnnonce) AS nbPhotos
@@ -95,19 +110,27 @@ $sql = "
     ORDER BY $orderBy
     LIMIT $offset, $perPage
 ";
+
 $res = mysqli_query($conn, $sql);
 $annonces = [];
-if ($res) while ($row = mysqli_fetch_assoc($res)) $annonces[] = $row;
+if ($res) {
+    while ($row = mysqli_fetch_assoc($res)) {
+        $annonces[] = $row;
+    }
+}
 
 /* Compteurs filtres */
 function countBy($conn, $sqlBase, $field) {
     $rs = mysqli_query($conn, "SELECT $field AS val, COUNT(*) AS nb $sqlBase GROUP BY $field");
     $out = [];
-    if ($rs) while ($row = mysqli_fetch_assoc($rs)) {
-        if ($row['val']) $out[$row['val']] = $row['nb'];
+    if ($rs) {
+        while ($row = mysqli_fetch_assoc($rs)) {
+            if ($row['val']) $out[$row['val']] = $row['nb'];
+        }
     }
     return $out;
 }
+
 $countCarburant = countBy($conn, $sqlBase, 'v.carburant');
 
 /* Favoris user */
@@ -115,7 +138,11 @@ $myFavoris = [];
 if (isset($_SESSION['idUtilisateur'])) {
     $idU = $esc($_SESSION['idUtilisateur']);
     $rFav = mysqli_query($conn, "SELECT idAnnonce FROM Favoris WHERE idUtilisateur = '$idU'");
-    if ($rFav) while ($f2 = mysqli_fetch_assoc($rFav)) $myFavoris[] = $f2['idAnnonce'];
+    if ($rFav) {
+        while ($f2 = mysqli_fetch_assoc($rFav)) {
+            $myFavoris[] = $f2['idAnnonce'];
+        }
+    }
 }
 
 /* Messages non lus */
@@ -141,16 +168,34 @@ function timeAgo($d) {
     if ($diff < 30) return "Il y a $diff jours";
     return (new DateTime($d))->format('d/m/Y');
 }
+
 function buildUrl($overrides = [], $remove = []) {
     global $f;
+
     $params = $f;
-    foreach ($overrides as $k => $v) $params[$k] = $v;
-    foreach ($remove as $k) unset($params[$k]);
+
+    /* On enlève la page actuelle pour éviter de rester sur une page inexistante après filtre */
     unset($params['page']);
-    if (isset($params['carburant']) && empty($params['carburant'])) unset($params['carburant']);
-    if (!isset($params['verifie']) || !$params['verifie']) unset($params['verifie']);
+
+    foreach ($remove as $k) {
+        unset($params[$k]);
+    }
+
+    foreach ($overrides as $k => $v) {
+        $params[$k] = $v;
+    }
+
+    if (isset($params['carburant']) && empty($params['carburant'])) {
+        unset($params['carburant']);
+    }
+
+    if (!isset($params['verifie']) || !$params['verifie']) {
+        unset($params['verifie']);
+    }
+
     return 'recherche.php?' . http_build_query($params);
 }
+
 function colorAvatar($id) {
     $colors = ['#185FA5', '#639922', '#BA7517', '#7F77DD', '#D85A30', '#1D9E75', '#993556'];
     $hash = 0;
@@ -158,51 +203,216 @@ function colorAvatar($id) {
     return $colors[$hash % count($colors)];
 }
 
+function getUnitePrixAnnonce($typeAnnonce, $description) {
+    $typeAnnonce = strtolower($typeAnnonce ?? 'vente');
+    $description = strtolower($description ?? '');
+
+    if ($typeAnnonce === 'location') {
+        if (strpos($description, 'da / km') !== false || strpos($description, 'da/km') !== false) {
+            return 'DA/km';
+        }
+        return 'DA/jour';
+    }
+
+    return 'DA';
+}
+
+function getBadgeTypeAnnonce($typeAnnonce) {
+    $typeAnnonce = strtolower($typeAnnonce ?? 'vente');
+
+    if ($typeAnnonce === 'location') {
+        return '<span class="card-tag tag-location">Location</span>';
+    }
+
+    return '<span class="card-tag tag-vente">Vente</span>';
+}
+
+function calculerTopDealRecherche($conn, $a) {
+    $typeAnnonce = strtolower($a['typeAnnonce'] ?? 'vente');
+
+    if ($typeAnnonce !== 'vente') {
+        return ['isDeal' => false, 'score' => 0, 'badge_label' => '', 'badge_class' => '', 'economie_pct' => 0, 'prix_moyen' => 0, 'hasReference' => false];
+    }
+
+    $anneeActuelle = (int)date('Y');
+    $idModele = $a['idModele'] ?? '';
+    $idAnnonce = $a['idAnnonce'] ?? '';
+    $annee = (int)($a['annee'] ?? 0);
+    $prix = (float)($a['prix'] ?? 0);
+    $km = (int)($a['kilometrage'] ?? 0);
+    $etat = strtolower($a['etatVehicule'] ?? 'occasion');
+
+    if (!$idModele || !$idAnnonce || $prix <= 0 || $annee < 1990) {
+        return ['isDeal' => false, 'score' => 0, 'badge_label' => '', 'badge_class' => '', 'economie_pct' => 0, 'prix_moyen' => 0, 'hasReference' => false];
+    }
+
+    $idModeleSql = mysqli_real_escape_string($conn, $idModele);
+    $idAnnonceSql = mysqli_real_escape_string($conn, $idAnnonce);
+    $anneeMin = $annee - 2;
+    $anneeMax = $annee + 2;
+
+    $scorePrix = 0;
+    $prixMoyen = 0;
+    $economiePct = 0;
+    $hasReference = false;
+
+    $rPrixMoyen = mysqli_query($conn, "
+        SELECT AVG(a2.prix) AS prix_moyen, COUNT(*) AS nb
+        FROM Annonce a2
+        INNER JOIN Vehicule v2 ON a2.idVehicule = v2.idVehicule
+        WHERE v2.idModele = '$idModeleSql'
+          AND v2.annee BETWEEN $anneeMin AND $anneeMax
+          AND a2.statutAnnonce = 'active'
+          AND a2.typeAnnonce = 'vente'
+          AND a2.idAnnonce != '$idAnnonceSql'
+    ");
+
+    if ($rPrixMoyen) {
+        $prixData = mysqli_fetch_assoc($rPrixMoyen);
+        $nbSimilaires = (int)($prixData['nb'] ?? 0);
+
+        if ($nbSimilaires >= 1 && (float)$prixData['prix_moyen'] > 0) {
+            $prixMoyen = (float)$prixData['prix_moyen'];
+            $ecartPrix = ($prixMoyen - $prix) / $prixMoyen;
+            $scorePrix = $ecartPrix * 100;
+            $economiePct = round($ecartPrix * 100);
+            $hasReference = true;
+        }
+    }
+
+    $age = max(1, $anneeActuelle - $annee);
+    $kmAttendu = $age * 15000;
+    $scoreKm = 0;
+
+    if ($kmAttendu > 0) {
+        $ecartKm = ($kmAttendu - $km) / $kmAttendu;
+        $scoreKm = max(-50, min(50, $ecartKm * 100));
+    }
+
+    $scoreAnnee = 0;
+    $rAnneeMoyenne = mysqli_query($conn, "
+        SELECT AVG(v3.annee) AS annee_moy
+        FROM Annonce a3
+        INNER JOIN Vehicule v3 ON a3.idVehicule = v3.idVehicule
+        WHERE v3.idModele = '$idModeleSql'
+          AND a3.statutAnnonce = 'active'
+          AND a3.typeAnnonce = 'vente'
+    ");
+
+    if ($rAnneeMoyenne) {
+        $anneeData = mysqli_fetch_assoc($rAnneeMoyenne);
+        if ($anneeData['annee_moy']) {
+            $scoreAnnee = ($annee - $anneeData['annee_moy']) * 5;
+        }
+    }
+
+    $scoreEtat = 0;
+    if ($etat === 'neuf') {
+        $scoreEtat = 20;
+    } elseif ($etat === 'accidente' || $etat === 'accidenté') {
+        $scoreEtat = -30;
+    }
+
+    if ($hasReference) {
+        $scoreFinal = ($scorePrix * 0.50) + ($scoreKm * 0.25) + ($scoreAnnee * 0.15) + ($scoreEtat * 0.10);
+    } else {
+        $scoreFinal = ($scoreKm * 0.50) + ($scoreAnnee * 0.30) + ($scoreEtat * 0.20);
+        $economiePct = 0;
+    }
+
+    $badgeLabel = '';
+    $badgeClass = '';
+
+    if ($scoreFinal >= 25) {
+        $badgeLabel = 'SUPER DEAL';
+        $badgeClass = 'super';
+    } elseif ($scoreFinal >= 15) {
+        $badgeLabel = 'TOP DEAL';
+        $badgeClass = 'top';
+    } elseif ($scoreFinal >= 5) {
+        $badgeLabel = 'BON PRIX';
+        $badgeClass = 'good';
+    }
+
+    return [
+        'isDeal' => $badgeLabel !== '',
+        'score' => $scoreFinal,
+        'badge_label' => $badgeLabel,
+        'badge_class' => $badgeClass,
+        'economie_pct' => $economiePct,
+        'prix_moyen' => $prixMoyen,
+        'hasReference' => $hasReference
+    ];
+}
+
 /* Marques disponibles */
 $rMarques = mysqli_query($conn, "
     SELECT DISTINCT m.nomMarque 
-    FROM Marque m 
-    JOIN Modele mo ON mo.idMarque = m.idMarque 
+    FROM marque m 
+    JOIN modele mo ON mo.idMarque = m.idMarque 
     JOIN Vehicule v ON v.idModele = mo.idModele 
     JOIN Annonce a ON a.idVehicule = v.idVehicule
     WHERE a.statutAnnonce = 'active'
     ORDER BY m.nomMarque ASC
 ");
+
 $marquesDispo = [];
-if ($rMarques) while ($r = mysqli_fetch_assoc($rMarques)) $marquesDispo[] = $r['nomMarque'];
+if ($rMarques) {
+    while ($r = mysqli_fetch_assoc($rMarques)) {
+        $marquesDispo[] = $r['nomMarque'];
+    }
+}
 
 $modelesDispo = [];
 if ($f['marque']) {
     $marqueEsc = $esc($f['marque']);
     $rModeles = mysqli_query($conn, "
         SELECT DISTINCT mo.nomModele 
-        FROM Modele mo 
-        JOIN Marque m ON mo.idMarque = m.idMarque
+        FROM modele mo 
+        JOIN marque m ON mo.idMarque = m.idMarque
         WHERE m.nomMarque = '$marqueEsc'
         ORDER BY mo.nomModele ASC
     ");
-    if ($rModeles) while ($r = mysqli_fetch_assoc($rModeles)) $modelesDispo[] = $r['nomModele'];
+    if ($rModeles) {
+        while ($r = mysqli_fetch_assoc($rModeles)) {
+            $modelesDispo[] = $r['nomModele'];
+        }
+    }
 }
 
 $wilayas = ['Adrar','Aïn Defla','Aïn Témouchent','Alger','Annaba','Batna','Béchar','Béjaïa','Biskra','Blida','Bordj Bou Arreridj','Bouira','Boumerdès','Chlef','Constantine','Djelfa','El Bayadh','El Oued','El Tarf','Ghardaïa','Guelma','Illizi','Jijel','Khenchela','Laghouat','Mascara','Médéa','Mila','Mostaganem','M\'Sila','Naâma','Oran','Ouargla','Oum El Bouaghi','Relizane','Saïda','Sétif','Sidi Bel Abbès','Skikda','Souk Ahras','Tamanrasset','Tébessa','Tiaret','Tindouf','Tipaza','Tissemsilt','Tizi Ouzou','Tlemcen'];
 
 /* Chips actifs */
 $activeChips = [];
+
+if ($f['typeAnnonce'] === 'vente') {
+    $activeChips[] = ['label' => 'Vente', 'remove' => 'typeAnnonce'];
+}
+
+if ($f['typeAnnonce'] === 'location') {
+    $activeChips[] = ['label' => 'Location', 'remove' => 'typeAnnonce'];
+}
+
 if ($f['type'])      $activeChips[] = ['label' => ucfirst($f['type']), 'remove' => 'type'];
 if ($f['marque'])    $activeChips[] = ['label' => $f['marque'], 'remove' => 'marque'];
 if ($f['modele'])    $activeChips[] = ['label' => $f['modele'], 'remove' => 'modele'];
+
 if ($f['annee_min'] || $f['annee_max']) {
     $lbl = ($f['annee_min'] ?: '...') . ' - ' . ($f['annee_max'] ?: '...');
     $activeChips[] = ['label' => $lbl, 'remove' => ['annee_min','annee_max']];
 }
+
 if ($f['prix_min'] || $f['prix_max']) {
-    $lbl = number_format((float)($f['prix_min']?:0),0,',',' ') . ' - ' . number_format((float)($f['prix_max']?:0),0,',',' ') . ' DA';
+    $lbl = number_format((float)($f['prix_min'] ?: 0), 0, ',', ' ') . ' - ' . number_format((float)($f['prix_max'] ?: 0), 0, ',', ' ') . ' DA';
     $activeChips[] = ['label' => $lbl, 'remove' => ['prix_min','prix_max']];
 }
-if ($f['km_max']) $activeChips[] = ['label' => '≤ ' . number_format((int)$f['km_max'],0,',',' ') . ' km', 'remove' => 'km_max'];
+
+if ($f['km_max']) $activeChips[] = ['label' => '≤ ' . number_format((int)$f['km_max'], 0, ',', ' ') . ' km', 'remove' => 'km_max'];
+
 foreach ($f['carburant'] as $carb) {
     $activeChips[] = ['label' => $carb, 'remove' => "carburant_$carb"];
 }
+
 if ($f['transmis']) $activeChips[] = ['label' => $f['transmis'], 'remove' => 'transmis'];
 if ($f['couleur'])  $activeChips[] = ['label' => $f['couleur'], 'remove' => 'couleur'];
 if ($f['wilaya'])   $activeChips[] = ['label' => $f['wilaya'], 'remove' => 'wilaya'];
@@ -309,7 +519,7 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
     .ad-card { display: flex; background: var(--bg0); border: 0.5px solid var(--bd); border-radius: var(--r10); overflow: hidden; cursor: pointer; transition: all .15s; position: relative; text-decoration: none; color: var(--t1); }
     .ad-card:hover { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(24,95,165,0.08); }
     .ad-card.deal { border-color: var(--orange); }
-    .ad-card.deal::before { content: '⭐ DEAL'; position: absolute; top: 8px; left: 8px; background: var(--orange); color: #fff; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 11px; z-index: 2; letter-spacing: 0.4px; }
+    .ad-card.deal::before { display: none; }
 
     .card-img { width: 240px; flex-shrink: 0; aspect-ratio: 4/3; background: linear-gradient(135deg, #c4c8d0, #a8b1bc); position: relative; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.5); overflow: hidden; }
     .card-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -334,6 +544,14 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
     .card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
     .card-tag { font-size: 10px; padding: 2px 8px; border-radius: 8px; background: var(--bg1); color: var(--t2); border: 0.5px solid var(--bd); }
     .card-tag.green { background: var(--green-bg); color: var(--green-dk); border-color: var(--green-bd); }
+    .card-tag.tag-location { background: #E6F1FB; color: #185FA5; border-color: #B5D4F4; font-weight: 700; }
+    .card-tag.tag-vente { background: #EAF3DE; color: #27500A; border-color: #C0DD97; font-weight: 700; }
+
+    .deal-badge-tag { color: #fff; font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; letter-spacing: 0.3px; }
+    .deal-badge-super { background: linear-gradient(135deg, #FF4D4D, #E24B4A); box-shadow: 0 2px 6px rgba(226,75,74,0.35); }
+    .deal-badge-top { background: linear-gradient(135deg, #16a34a, #15803d); box-shadow: 0 2px 6px rgba(22,163,74,0.30); }
+    .deal-badge-good { background: linear-gradient(135deg, #FFA366, #FF8A4C); box-shadow: 0 2px 6px rgba(255,138,76,0.30); }
+    .deal-score-small { font-size: 10px; color: var(--t3); margin-top: 4px; }
 
     .card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 8px; border-top: 0.5px solid var(--bd); font-size: 11px; color: var(--t3); gap: 10px; flex-wrap: wrap; }
     .card-seller { display: flex; align-items: center; gap: 6px; color: var(--t2); }
@@ -361,7 +579,9 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
       .sidebar.show { display: flex; }
       .mobile-filter-btn { display: inline-flex !important; }
     }
+
     .mobile-filter-btn { display: none; }
+
     @media (max-width: 600px) {
       .container { padding: 10px; }
       .nav-search-mini { display: none; }
@@ -382,6 +602,9 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
     </a>
 
     <form class="nav-search-mini" action="recherche.php" method="GET">
+      <?php if ($f['typeAnnonce']): ?>
+        <input type="hidden" name="typeAnnonce" value="<?= htmlspecialchars($f['typeAnnonce']) ?>">
+      <?php endif; ?>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input type="text" name="q" id="nav-q" placeholder="Rechercher un véhicule..." value="<?= htmlspecialchars($f['q']) ?>">
     </form>
@@ -411,15 +634,19 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
 
     <div class="breadcrumb">
       <a href="index.php">Accueil</a>
+      <?php if ($f['typeAnnonce']): ?>
+        <span class="sep">›</span>
+        <span class="active"><?= $f['typeAnnonce'] === 'location' ? 'Location' : 'Vente' ?></span>
+      <?php endif; ?>
       <?php if ($f['type']): ?>
         <span class="sep">›</span>
-        <a href="recherche.php?type=<?= urlencode($f['type']) ?>"><?= ucfirst($f['type']) ?>s</a>
+        <a href="recherche.php?type=<?= urlencode($f['type']) ?><?= $f['typeAnnonce'] ? '&typeAnnonce=' . urlencode($f['typeAnnonce']) : '' ?>"><?= ucfirst($f['type']) ?>s</a>
       <?php else: ?>
         <span class="sep">›</span><span class="active">Tous les véhicules</span>
       <?php endif; ?>
       <?php if ($f['marque']): ?>
         <span class="sep">›</span>
-        <a href="recherche.php?marque=<?= urlencode($f['marque']) ?>"><?= htmlspecialchars($f['marque']) ?></a>
+        <a href="recherche.php?marque=<?= urlencode($f['marque']) ?><?= $f['typeAnnonce'] ? '&typeAnnonce=' . urlencode($f['typeAnnonce']) : '' ?>"><?= htmlspecialchars($f['marque']) ?></a>
       <?php endif; ?>
       <?php if ($f['modele']): ?>
         <span class="sep">›</span>
@@ -431,10 +658,14 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
       <div>
         <div class="result-title">
           <?php
-          $title = "Véhicules en Algérie";
-          if ($f['marque'] && $f['modele']) $title = htmlspecialchars($f['marque']) . " " . htmlspecialchars($f['modele']) . " d'occasion";
-          elseif ($f['marque']) $title = htmlspecialchars($f['marque']) . " d'occasion";
-          elseif ($f['type']) $title = ucfirst($f['type']) . "s en Algérie";
+          $prefix = '';
+          if ($f['typeAnnonce'] === 'location') $prefix = 'Location — ';
+          if ($f['typeAnnonce'] === 'vente') $prefix = 'Vente — ';
+
+          $title = $prefix . "Véhicules en Algérie";
+          if ($f['marque'] && $f['modele']) $title = $prefix . htmlspecialchars($f['marque']) . " " . htmlspecialchars($f['modele']);
+          elseif ($f['marque']) $title = $prefix . htmlspecialchars($f['marque']);
+          elseif ($f['type']) $title = $prefix . ucfirst($f['type']) . "s en Algérie";
           echo $title;
           ?>
         </div>
@@ -497,6 +728,18 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
       <aside class="sidebar" id="sidebar">
         <form id="filter-form" method="GET" action="recherche.php">
           <input type="hidden" name="q" value="<?= htmlspecialchars($f['q']) ?>">
+          <input type="hidden" name="typeAnnonce" value="<?= htmlspecialchars($f['typeAnnonce']) ?>">
+
+          <div class="filter-card">
+            <div class="filter-h">Type d'annonce</div>
+            <div class="filter-body">
+              <div class="pill-group">
+                <a class="pill <?= !$f['typeAnnonce']?'active':'' ?>" href="<?= buildUrl([], ['typeAnnonce']) ?>">Toutes</a>
+                <a class="pill <?= $f['typeAnnonce']==='vente'?'active':'' ?>" href="<?= buildUrl(['typeAnnonce'=>'vente']) ?>">Vente</a>
+                <a class="pill <?= $f['typeAnnonce']==='location'?'active':'' ?>" href="<?= buildUrl(['typeAnnonce'=>'location']) ?>">Location</a>
+              </div>
+            </div>
+          </div>
 
           <div class="filter-card">
             <div class="filter-h">Type de véhicule</div>
@@ -543,9 +786,9 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
             <div class="filter-h">Année</div>
             <div class="filter-body">
               <div class="filter-row">
-                <input type="number" name="annee_min" class="filter-input" placeholder="Min" min="1990" max="2026" value="<?= htmlspecialchars($f['annee_min']) ?>">
+                <input type="number" name="annee_min" class="filter-input" placeholder="Min" min="1990" max="2030" value="<?= htmlspecialchars($f['annee_min']) ?>">
                 <span class="filter-arrow">→</span>
-                <input type="number" name="annee_max" class="filter-input" placeholder="Max" min="1990" max="2026" value="<?= htmlspecialchars($f['annee_max']) ?>">
+                <input type="number" name="annee_max" class="filter-input" placeholder="Max" min="1990" max="2030" value="<?= htmlspecialchars($f['annee_max']) ?>">
               </div>
             </div>
           </div>
@@ -649,8 +892,13 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
           </div>
         <?php else:
           foreach ($annonces as $a):
+            $typeAnnonce = strtolower($a['typeAnnonce'] ?? 'vente');
+            $unitePrix = getUnitePrixAnnonce($typeAnnonce, $a['description'] ?? '');
+            $badgeTypeAnnonce = getBadgeTypeAnnonce($typeAnnonce);
+            $dealInfo = calculerTopDealRecherche($conn, $a);
+
             $isFav = in_array($a['idAnnonce'], $myFavoris);
-            $isDeal = ($prixMoyen > 0 && $a['prix'] < $prixMoyen * 0.95);
+            $isDeal = $dealInfo['isDeal'];
             $titre = htmlspecialchars($a['titre']);
             $prix = number_format($a['prix'], 0, ',', ' ');
             $loc = htmlspecialchars($a['localisation']);
@@ -658,10 +906,10 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
             $nomVend = trim(($a['vendeur_prenom'] ?? '') . ' ' . substr($a['vendeur_nom'] ?? '', 0, 1) . '.');
             $initVend = strtoupper(substr($a['vendeur_prenom'] ?? 'U', 0, 1));
             $colorVend = colorAvatar($a['idVendeur']);
-            $sousTitre = trim(($a['etatVehicule']?:'') . ($a['nomMarque']?' · '.$a['nomMarque']:'') . ($a['nomModele']?' '.$a['nomModele']:''), ' ·');
-            $diff = $prixMoyen > 0 ? $prixMoyen - $a['prix'] : 0;
+            $sousTitre = trim(($a['etatVehicule'] ?: '') . ($a['nomMarque'] ? ' · ' . $a['nomMarque'] : '') . ($a['nomModele'] ? ' ' . $a['nomModele'] : ''), ' ·');
+            $diff = ($dealInfo['hasReference'] && $dealInfo['prix_moyen'] > 0) ? $dealInfo['prix_moyen'] - $a['prix'] : 0;
         ?>
-          <a class="ad-card <?= $isDeal?'deal':'' ?>" href="fiche_annonce.php?id=<?= urlencode($a['idAnnonce']) ?>">
+          <a class="ad-card <?= $isDeal?'deal':'' ?>" href="ficheAnnonces.php?id=<?= urlencode($a['idAnnonce']) ?>">
             <div class="card-img">
               <?php if ($a['photo']): ?>
                 <img src="<?= htmlspecialchars($a['photo']) ?>" alt="<?= $titre ?>" onerror="this.style.display='none'">
@@ -690,9 +938,10 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
                   <?php endif; ?>
                 </div>
                 <div class="card-price-block">
-                  <div class="card-price"><?= $prix ?> DA</div>
+                  <div class="card-price"><?= $prix ?> <?= $unitePrix ?></div>
                   <?php if ($isDeal): ?>
                     <div class="card-price-info">↓ <?= number_format($diff, 0, ',', ' ') ?> DA / moy.</div>
+                    <div class="deal-score-small">Score deal : <?= number_format($dealInfo['score'], 1, ',', ' ') ?></div>
                   <?php endif; ?>
                 </div>
               </div>
@@ -706,6 +955,15 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
               </div>
 
               <div class="card-tags">
+                <?= $badgeTypeAnnonce ?>
+
+                <?php if ($isDeal): ?>
+                  <span class="deal-badge-tag deal-badge-<?= htmlspecialchars($dealInfo['badge_class']) ?>">
+                    <?php if ($dealInfo['badge_class'] === 'super'): ?>🔥<?php elseif ($dealInfo['badge_class'] === 'top'): ?>✓<?php else: ?>★<?php endif; ?>
+                    <?= htmlspecialchars($dealInfo['badge_label']) ?>
+                  </span>
+                <?php endif; ?>
+
                 <?php if ($a['etatVehicule']): ?>
                   <span class="card-tag"><?= ucfirst(htmlspecialchars($a['etatVehicule'])) ?></span>
                 <?php endif; ?>
@@ -742,7 +1000,7 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
           <?php
           $pagesToShow = [1];
           if ($f['page'] > 3) $pagesToShow[] = '...';
-          for ($i = max(2, $f['page']-1); $i <= min($totalPages-1, $f['page']+1); $i++) {
+          for ($i = max(2, $f['page'] - 1); $i <= min($totalPages - 1, $f['page'] + 1); $i++) {
               $pagesToShow[] = $i;
           }
           if ($f['page'] < $totalPages - 2) $pagesToShow[] = '...';
@@ -780,13 +1038,19 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
         location.href = 'inscription.php';
         return;
       <?php endif; ?>
+
       const fd = new FormData();
       fd.append('action', 'toggle');
       fd.append('idAnnonce', id);
+
       fetch('toggle_favori.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(json => {
-          if (json.needLogin) { location.href = 'inscription.php'; return; }
+          if (json.needLogin) {
+            location.href = 'inscription.php';
+            return;
+          }
+
           btn.classList.toggle('faved', json.favori);
           btn.querySelector('svg').setAttribute('fill', json.favori ? 'currentColor' : 'none');
           showToast(json.favori ? '❤️ Ajouté aux favoris' : 'Retiré des favoris');
@@ -799,9 +1063,11 @@ if ($f['verifie'])  $activeChips[] = ['label' => '✓ Vérifié', 'remove' => 'v
         location.href = 'inscription.php?redirect=recherche.php';
         return;
       <?php endif; ?>
+
       const fd = new FormData();
       fd.append('action', 'save_search');
       fd.append('params', location.search);
+
       fetch('save_search.php', { method: 'POST', body: fd })
         .then(r => r.json())
         .then(json => {

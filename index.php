@@ -2,9 +2,60 @@
 session_start();
 require_once 'connexion.php';
 require_once 'notification_helper.php';
+
+$estConcessionnaireValide = false;
+
+if (isset($_SESSION['idUtilisateur'])) {
+    $idUserHeader = mysqli_real_escape_string($conn, $_SESSION['idUtilisateur']);
+
+    $rProHeader = mysqli_query($conn, "
+        SELECT u.role, c.statutPro
+        FROM Utilisateur u
+        INNER JOIN Concessionnaire c ON c.idUtilisateur = u.idUtilisateur
+        WHERE u.idUtilisateur = '$idUserHeader'
+        LIMIT 1
+    ");
+
+    if ($rProHeader && mysqli_num_rows($rProHeader) > 0) {
+        $proHeader = mysqli_fetch_assoc($rProHeader);
+
+        if (
+            ($proHeader['role'] ?? '') === 'concessionnaire' &&
+            ($proHeader['statutPro'] ?? '') === 'valide'
+        ) {
+            $estConcessionnaireValide = true;
+            $_SESSION['role'] = 'concessionnaire';
+        }
+    }
+}
 $publie = isset($_GET['publie']) && $_GET['publie'] == '1';
 $counts_type = ['voiture' => 0, 'moto' => 0, 'camion' => 0];
 $marquesDB = [];
+
+
+function getUnitePrixAnnonce($typeAnnonce, $description) {
+    $typeAnnonce = strtolower($typeAnnonce ?? 'vente');
+    $description = strtolower($description ?? '');
+
+    if ($typeAnnonce === 'location') {
+        if (strpos($description, 'da / km') !== false || strpos($description, 'da/km') !== false) {
+            return 'DA/km';
+        }
+        return 'DA/jour';
+    }
+
+    return 'DA';
+}
+
+function getBadgeTypeAnnonce($typeAnnonce) {
+    $typeAnnonce = strtolower($typeAnnonce ?? 'vente');
+
+    if ($typeAnnonce === 'location') {
+        return '<span class="annonce-type-badge badge-location">Location</span>';
+    }
+
+    return '<span class="annonce-type-badge badge-vente">Vente</span>';
+}
 
 
 
@@ -98,7 +149,7 @@ $anneeActuelle = (int)date('Y');
 
 $sql_top = "
     SELECT
-        a.idAnnonce, a.titre, a.prix, a.localisation, a.datePublication,
+        a.idAnnonce, a.titre, a.prix, a.localisation, a.datePublication, a.typeAnnonce, a.description,
         v.idVehicule, v.annee, v.kilometrage, v.carburant, v.transmission, 
         v.puissance, v.etatVehicule,
         mo.idModele, mo.nomModele,
@@ -109,6 +160,7 @@ $sql_top = "
     INNER JOIN modele mo   ON v.idModele = mo.idModele
     INNER JOIN marque ma   ON mo.idMarque = ma.idMarque
     WHERE a.statutAnnonce = 'active'
+      AND a.typeAnnonce = 'vente'
       AND a.idVendeur != ''
       AND a.idVendeur IS NOT NULL
     LIMIT 50
@@ -1422,6 +1474,29 @@ body {
   border: 0.5px solid var(--blue-bd);
 }
 
+.annonce-type-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+}
+
+.badge-location {
+  background: #E6F1FB;
+  color: #185FA5;
+  border: 0.5px solid #B5D4F4;
+}
+
+.badge-vente {
+  background: #EAF3DE;
+  color: #27500A;
+  border: 0.5px solid #C0DD97;
+}
+
 .ldate { font-size: 11px; color: var(--t3); }
 
 .footer {
@@ -1802,6 +1877,11 @@ body {
               <span class="dropdown-badge"><?= $nbMessagesNonLus > 9 ? '9+' : $nbMessagesNonLus ?></span>
             <?php endif; ?>
           </a>
+          <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'concessionnaire'): ?>
+            <a href="dashboard_concessionnaire.php" class="dropdown-item" style="color:#185FA5;font-weight:600">
+              Dashboard Pro
+            </a>
+          <?php endif; ?>
           <a href="favoris.php" class="dropdown-item">Mes favoris</a>
 
           <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin'): ?>
@@ -1880,7 +1960,7 @@ body {
       </button>
       <button class="vtype-icon-btn" id="vt-camion" onclick="setVType('camion')" title="Camion">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M19.1 7.8c-.38-.5-.97-.8-1.6-.8H15V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2 0 1.65 1.35 3 3 3s3-1.35 3-3h4c0 1.65 1.35 3 3 3s3-1.35 3-3c1.1 0 2-.9 2-2v-3.67c0-.43-.14-.86-.4-1.2zM17.5 9l1.5 2h-4V9zM7 19a1.003 1.003 0 0 1-.87-1.5c.37-.63 1.36-.63 1.73 0 .09.15.13.32.13.49 0 .55-.45 1-1 1Zm2.23-3s-.05-.05-.08-.07c-.06-.06-.12-.11-.17-.16-.12-.11-.25-.21-.38-.29a3 3 0 0 0-.67-.32c-.07-.02-.14-.05-.21-.07Q7.375 15 7 15c-.375 0-.49.04-.72.09-.07.02-.14.05-.21.07-.16.05-.31.11-.45.19-.07.04-.15.08-.22.13-.13.09-.26.18-.38.29-.06.05-.12.1-.18.16-.02.03-.05.04-.08.07h-.77V6h9v10H9.22ZM17 19a1.003 1.003 0 0 1-.87-1.5c.37-.63 1.36-.63 1.73 0 .09.15.13.32.13.49 0 .55-.45 1-1 1Zm3-3h-.77s-.05-.05-.08-.07c-.06-.06-.12-.11-.17-.16-.12-.11-.25-.21-.38-.29a3 3 0 0 0-.67-.32c-.07-.02-.14-.05-.21-.07Q17.375 15 17 15c-.375 0-.47.04-.7.09-.06.01-.12.03-.18.05-.18.06-.36.13-.52.22l-.12.06c-.17.1-.33.21-.48.35v-2.76h5v3Z"/>
+          <path d="M19.1 7.8c-.38-.5-.97-.8-1.6-.8H15V6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2 0 1.65 1.35 3 3 3s3-1.35 3-3h4c0 1.65 1.35 3 3 3s3-1.35 3-3c1.1 0 2-.9 2-2v-3.67c0-.43-.14-.86-.4-1.2zM17.5 9l1.5 2h-4V9zM7 19a1.003 1.003 0 0 1-.87-1.5c.37-.63 1.36-.63 1.73 0 .09.15.13.32.13.49 0 .55-.45 1-1 1Zm2.23-3s-.05-.05-.08-.07c-.06-.06-.12-.11-.17-.16-.12-.11-.25-.21-.38-.29a3 3 0 0 0-.67-.32c-.07-.02-.14-.05-.21-.07Q7.375 15 7 15c-.375 0-.49.03-.71.09-.07.02-.14.04-.21.07-.24.08-.47.19-.67.32-.13.09-.26.19-.38.29-.06.05-.12.1-.17.16-.03.03-.06.05-.08.07H4V6h9v10H9.23ZM17 19a1.003 1.003 0 0 1-.87-1.5c.37-.63 1.36-.63 1.73 0 .09.15.13.32.13.49 0 .55-.45 1-1 1Z"/>
         </svg>
         <span class="vtype-label">Camion</span>
       </button>
@@ -1892,38 +1972,34 @@ body {
         <div class="search-tab" id="st-rent" onclick="setSTab('rent')">Louer</div>
       </div>
 
-    <div class="sf-grid sf-grid-row1">
-  <div>
-    <div class="sf-label" id="lbl-marque">Marque</div>
-    <select class="sf-select" id="sel-marque" onchange="updateModels()">
-      <option value="">Quelconque</option>
-    </select>
-  </div>
-
-  <div>
-    <div class="sf-label" id="lbl-modele">Modèle</div>
-    <select class="sf-select" id="sel-modele">
-      <option value="">Quelconque</option>
-    </select>
-  </div>
-
-  <div id="col-annee">
-    <div class="sf-label">Année depuis</div>
-    <select class="sf-select" id="sel-annee">
-      <option value="">Quelconque</option>
-      <option>2024</option><option>2023</option><option>2022</option>
-      <option>2021</option><option>2020</option><option>2019</option>
-      <option>2018</option><option>≤ 2017</option>
-    </select>
-  </div>
-
-  <div id="col-km">
-    <div class="sf-label" id="lbl-km">Kilomètres jusqu'à</div>
-    <select class="sf-select" id="sel-km">
-      <option value="">Quelconque</option>
-    </select>
-  </div>
-</div>
+      <div class="sf-grid sf-grid-row1">
+        <div>
+          <div class="sf-label" id="lbl-marque">Marque</div>
+          <select class="sf-select" id="sel-marque" onchange="updateModels()"><option>Quelconque</option></select>
+        </div>
+        <div>
+          <div class="sf-label" id="lbl-modele">Modèle</div>
+          <select class="sf-select" id="sel-modele"><option>Quelconque</option></select>
+        </div>
+        <div>
+          <div class="sf-label">Année à partir de</div>
+          <select class="sf-select" id="sel-annee">
+            <option value="">Quelconque</option>
+            <option>2025</option><option>2024</option><option>2023</option><option>2022</option>
+            <option>2021</option><option>2020</option><option>2019</option><option>2018</option>
+            <option>2017</option><option>2016</option><option>2015</option><option>2010</option>
+          </select>
+        </div>
+        <div>
+          <div class="sf-label" id="lbl-km">Kilomètres jusqu'à</div>
+          <select class="sf-select" id="sel-km">
+            <option value="">Quelconque</option>
+            <option>10 000 km</option><option>30 000 km</option><option>50 000 km</option>
+            <option>80 000 km</option><option>100 000 km</option><option>150 000 km</option>
+            <option>200 000 km</option>
+          </select>
+        </div>
+      </div>
 
       <div class="sf-grid sf-grid-row2">
         <div id="col-paiement">
@@ -2060,6 +2136,7 @@ body {
 
           <div class="deal-body">
             <div class="deal-title"><?= $titre ?></div>
+            <?= getBadgeTypeAnnonce('vente') ?>
             <div class="deal-price">
               <span class="deal-price-val"><?= $prix ?></span>
               <span class="deal-price-unit">DA</span>
@@ -2358,10 +2435,45 @@ body {
       }
     }
 
+    let currentSearchTypeAnnonce = 'vente';
+
     function setSTab(t) {
+      currentSearchTypeAnnonce = (t === 'rent') ? 'location' : 'vente';
+
       ['buy','rent'].forEach(id => {
         document.getElementById('st-' + id).classList.toggle('active', id === t);
       });
+
+      const lblPrix = document.getElementById('lbl-prix');
+      const selPrix = document.getElementById('sel-prix');
+
+      if (lblPrix && selPrix) {
+        if (currentSearchTypeAnnonce === 'location') {
+          lblPrix.textContent = 'Prix location jusqu\'à';
+          selPrix.innerHTML = `
+            <option value="">Quelconque</option>
+            <option>2 000 DA</option>
+            <option>5 000 DA</option>
+            <option>8 000 DA</option>
+            <option>10 000 DA</option>
+            <option>15 000 DA</option>
+            <option>20 000 DA</option>
+            <option>50 000 DA</option>
+          `;
+        } else {
+          lblPrix.textContent = 'Prix jusqu\'à';
+          selPrix.innerHTML = `
+            <option value="">Quelconque</option>
+            <option>500 000 DA</option>
+            <option>1 000 000 DA</option>
+            <option>2 000 000 DA</option>
+            <option>3 000 000 DA</option>
+            <option>5 000 000 DA</option>
+            <option>8 000 000 DA</option>
+            <option>10 000 000 DA</option>
+          `;
+        }
+      }
     }
 
     function setPayMode(m) {
@@ -2389,6 +2501,7 @@ body {
       const wilaya = document.getElementById('inp-wilaya').value;
 
       if (currentVType) params.set('type', currentVType);
+      if (currentSearchTypeAnnonce) params.set('typeAnnonce', currentSearchTypeAnnonce);
       if (marque) params.set('marque', marque);
       if (modele) params.set('modele', modele);
       if (annee) params.set('annee_min', annee.replace(/[^0-9]/g, ''));

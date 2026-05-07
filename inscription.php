@@ -219,6 +219,12 @@ if ($action === 'register') {
                 "pro_attente",
                 "verification_compte_pro.php"
             );
+            notifierAdmins(
+                $conn,
+                "Nouvelle demande de compte professionnel créée par " . $p . " " . $n . ". En attente du justificatif RC.",
+                "pro_attente",
+                "admin_demandes_pro.php"
+            );
         }
 
         mysqli_commit($conn);

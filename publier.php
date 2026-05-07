@@ -253,12 +253,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $cylindree   = (int)($_POST['cylindree'] ?? 0);
     $portes      = (int)($_POST['portes'] ?? 0);
     $places      = (int)($_POST['places'] ?? 0);
+    $chargeUtile = (int)($_POST['chargeUtile'] ?? 0);
+    $volumeUtile = (int)($_POST['volumeUtile'] ?? 0);
     $etat        = mysqli_real_escape_string($conn, $_POST['etat'] ?? 'occasion');
     $couleurExt  = trim($_POST['couleur_ext'] ?? '');
     $couleurInt  = trim($_POST['couleur_int'] ?? '');
     $titre       = trim($_POST['titre'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $prix        = (float)($_POST['prix'] ?? 0);
+    $typeAnnonce = mysqli_real_escape_string($conn, $_POST['typeAnnonce'] ?? 'vente');
+
+    if (!in_array($typeAnnonce, ['vente', 'location'])) {
+        $typeAnnonce = 'vente';
+    }
+
+    /*
+      Sécurité :
+      Seuls les concessionnaires validés peuvent publier une annonce de location.
+    */
+    if ($typeAnnonce === 'location' && !$estConcessionnaireValide) {
+        echo json_encode([
+            'success' => false,
+            'errors' => ["Seuls les concessionnaires vérifiés peuvent publier des annonces de location."]
+        ]);
+        exit;
+    }
+$caution = (float)($_POST['caution'] ?? 0);
+
+$tarificationLocation = mysqli_real_escape_string($conn, $_POST['tarificationLocation'] ?? 'jour');
+
+if (!in_array($tarificationLocation, ['jour', 'km'])) {
+    $tarificationLocation = 'jour';
+}
     $localisation= mysqli_real_escape_string($conn, $_POST['wilaya'] ?? '');
     $negociable  = isset($_POST['negociable']) ? 1 : 0;
     $credit      = isset($_POST['credit']) ? 1 : 0;
@@ -277,7 +303,7 @@ $immatE = mysqli_real_escape_string($conn, $immatriculation);
     if (!$marque) $errors[] = "Marque obligatoire.";
     if (!$modele) $errors[] = "Modele obligatoire.";
     if (!$vin) $errors[] = "VIN obligatoire.";
-if (!$immatriculation) $errors[] = "Immatriculation obligatoire.";
+    if (!$immatriculation) $errors[] = "Immatriculation obligatoire.";
     if ($annee < 1900 || $annee > 2030) $errors[] = "Annee invalide.";
     if ($prix <= 0) $errors[] = "Prix invalide.";
     if (!$localisation) $errors[] = "Wilaya obligatoire.";
@@ -307,7 +333,23 @@ if (!$immatriculation) $errors[] = "Immatriculation obligatoire.";
 
     $couleurFull = $couleurExt . ($couleurInt ? " / int. $couleurInt" : '');
     $couleurFullE = mysqli_real_escape_string($conn, $couleurFull);
-    $descriptionE = mysqli_real_escape_string($conn, $description);
+    if ($typeAnnonce === 'location') {
+    $description .= "\n\n--- Informations de location ---";
+
+    if ($tarificationLocation === 'jour') {
+        $description .= "\nPrix de location : " . number_format($prix, 0, ',', ' ') . " DA / jour";
+    }
+
+    if ($tarificationLocation === 'km') {
+        $description .= "\nPrix de location : " . number_format($prix, 0, ',', ' ') . " DA / km";
+    }
+
+    if ($caution > 0) {
+        $description .= "\nCaution : " . number_format($caution, 0, ',', ' ') . " DA";
+    }
+}
+
+$descriptionE = mysqli_real_escape_string($conn, $description);
   $checkDoublon = mysqli_query($conn, "
     SELECT a.idAnnonce
     FROM Annonce a
@@ -374,9 +416,47 @@ if ($checkDoublon && mysqli_num_rows($checkDoublon) > 0) {
         /* === INSERT Vehicule avec idModele réel === */
         $idVersionSql = $idVersion ? "'$idVersion'" : 'NULL';
        $sqlV = "INSERT INTO Vehicule 
-(idVehicule, idVersion, idModele, typeVehicule, vin, immatriculation, annee, kilometrage, carburant, transmission, puissance, couleur, nbrPortes, nbrPlaces, etatVehicule, cylindree) 
-VALUES 
-('$idVehicule', $idVersionSql, '$idModele', '$type', '$vinE', '$immatE', $annee, $km, '$carburant', '$transmission', " . ($puissance ?: 'NULL') . ", '$couleurFullE', " . ($portes ?: 'NULL') . ", " . ($places ?: 'NULL') . ", '$etat', " . ($cylindree ?: 'NULL') . ")";
+          (
+            idVehicule,
+            idVersion,
+            idModele,
+            typeVehicule,
+            vin,
+            immatriculation,
+            annee,
+            kilometrage,
+            carburant,
+            transmission,
+            puissance,
+            couleur,
+            nbrPortes,
+            nbrPlaces,
+            etatVehicule,
+            cylindree,
+            chargeUtile,
+            volumeUtile
+          ) 
+          VALUES 
+          (
+            '$idVehicule',
+            $idVersionSql,
+            '$idModele',
+            '$type',
+            '$vinE',
+            '$immatE',
+            $annee,
+            $km,
+            '$carburant',
+            '$transmission',
+            " . ($puissance ?: 'NULL') . ",
+            '$couleurFullE',
+            " . ($portes ?: 'NULL') . ",
+            " . ($places ?: 'NULL') . ",
+            '$etat',
+            " . ($cylindree ?: 'NULL') . ",
+            " . ($chargeUtile ?: 'NULL') . ",
+            " . ($volumeUtile ?: 'NULL') . "
+          )";
         if (!mysqli_query($conn, $sqlV)) throw new Exception("Erreur Vehicule : " . mysqli_error($conn));
 
         $today = date('Y-m-d');
@@ -446,7 +526,7 @@ if ($scoreDoublon >= 70) {
 $sqlA = "INSERT INTO Annonce 
 (idAnnonce, idVehicule, idVendeur, titre, description, prix, datePublication, dateExpiration, statutAnnonce, typeAnnonce, localisation, vendeurVerif, scoreDoublon, motifModeration) 
 VALUES 
-('$idAnnonce', '$idVehicule', '$idUserSql', '$titreFinalE', '$descriptionE', $prix, '$today', '$expir', '$statutAnnonce', 'vente', '$localisation', 0, $scoreDoublon, '$motifModerationE')";
+('$idAnnonce', '$idVehicule', '$idUserSql', '$titreFinalE', '$descriptionE', $prix, '$today', '$expir', '$statutAnnonce', '$typeAnnonce', '$localisation', 0, $scoreDoublon, '$motifModerationE')";
         if (!mysqli_query($conn, $sqlA)) throw new Exception("Erreur Annonce : " . mysqli_error($conn));
 
         /* Incrémenter compteur d'annonces actives du vendeur */
@@ -636,11 +716,11 @@ VALUES
     .field-label .req { color: var(--red); }
     .field-input, .field-select { height: 40px; border: 0.5px solid var(--bd2); border-radius: var(--r8); padding: 0 12px; font-size: 13px; background: var(--bg0); font-family: inherit; outline: none; width: 100%; transition: all .15s; }
     .field-select { appearance: none; padding-right: 30px; background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
-    .field-input:focus, .field-select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(24,95,165,.1); }
+    .field-input:hover, .field-select:hover { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(24,95,165,.1); }
     .field-input.filled, .field-select.filled { border-color: var(--blue); background: #F8FBFF; }
     .field-input.error { border-color: var(--red); background: var(--red-bg); }
     .field-textarea { min-height: 100px; padding: 10px 12px; border: 0.5px solid var(--bd2); border-radius: var(--r8); font-size: 13px; resize: vertical; font-family: inherit; outline: none; width: 100%; transition: all .15s; }
-    .field-textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(24,95,165,.1); }
+    .field-textarea:hover { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(24,95,165,.1); }
     .field-hint { font-size: 11px; color: var(--t3); display: flex; justify-content: space-between; margin-top: 2px; }
 
     /* INPUT WITH ICON */
@@ -684,8 +764,11 @@ VALUES
     .price-row { display: flex; gap: 10px; align-items: end; }
     .price-input-wrap { position: relative; flex: 1; }
     .price-input-wrap input { width: 100%; height: 52px; padding: 0 60px 0 14px; font-size: 22px; font-weight: 600; border: 0.5px solid var(--bd2); border-radius: var(--r8); font-family: inherit; outline: none; color: var(--blue); }
-    .price-input-wrap input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(24,95,165,.1); }
+    .price-input-wrap input:hover { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(24,95,165,.1); }
     .price-unit { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--t3); pointer-events: none; font-weight: 500; }
+    .input-unit-wrap { position: relative; }
+    .input-unit-wrap .field-input { padding-right: 58px; }
+    .input-unit { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--t3); font-size: 13px; font-weight: 500; pointer-events: none; }
     .price-toggles { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
     .price-chip { padding: 8px 14px; border: 0.5px solid var(--bd2); border-radius: 20px; font-size: 12px; cursor: pointer; background: var(--bg0); transition: all .15s; user-select: none; display: flex; align-items: center; gap: 6px; }
     .price-chip:hover { border-color: var(--blue); }
@@ -824,6 +907,46 @@ VALUES
           <input type="hidden" name="type" id="f-type" value="voiture">
         </div>
 
+        <?php if ($estConcessionnaireValide): ?>
+        <div class="form-card" style="margin-top:14px;">
+          <div class="form-card-h">
+            <div class="form-card-h-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1v22"/>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6"/>
+              </svg>
+            </div>
+            <div>
+              <div class="form-card-h-title">Type d’annonce</div>
+              <div class="form-card-h-sub">Choisissez si le véhicule est à vendre ou à louer.</div>
+            </div>
+          </div>
+
+          <div class="type-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="type-card selected" data-annonce-type="vente" onclick="selectAnnonceType(this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6L9 17l-5-5"/>
+              </svg>
+              <span class="type-name">Vente</span>
+            </div>
+
+            <div class="type-card" data-annonce-type="location" onclick="selectAnnonceType(this)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              <span class="type-name">Location</span>
+            </div>
+          </div>
+
+          <input type="hidden" name="typeAnnonce" id="f-type-annonce" value="vente">
+        </div>
+        <?php else: ?>
+          <input type="hidden" name="typeAnnonce" id="f-type-annonce" value="vente">
+        <?php endif; ?>
+
         <div class="actions">
           <a href="index.php" class="btn-prev">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
@@ -911,7 +1034,7 @@ VALUES
           <div class="grid-2">
             <div class="field">
               <label class="field-label">Carburant <span class="req">*</span></label>
-              <select class="field-select" name="carburant" onchange="checkFilled(this)">
+              <select class="field-select" name="carburant" id="f-carburant" onchange="checkFilled(this)">
                 <option value="">Choisir...</option>
                 <option>Essence</option><option>Diesel</option><option>GPL</option>
                 <option>Hybride</option><option>Électrique</option>
@@ -919,7 +1042,7 @@ VALUES
             </div>
             <div class="field">
               <label class="field-label">Transmission <span class="req">*</span></label>
-              <select class="field-select" name="transmission" onchange="checkFilled(this)">
+              <select class="field-select" name="transmission" id="f-transmission" onchange="checkFilled(this)">
                 <option value="">Choisir...</option>
                 <option>Manuelle</option><option>Automatique</option><option>Semi-automatique</option>
               </select>
@@ -945,7 +1068,7 @@ VALUES
             </div>
           </div>
 
-          <div class="grid-2">
+          <div class="grid-2" id="bloc-portes-places">
             <div class="field">
               <label class="field-label">Nb portes</label>
               <select class="field-select" name="portes" onchange="checkFilled(this)">
@@ -961,7 +1084,35 @@ VALUES
               </select>
             </div>
           </div>
+
+          <div class="grid-2" id="bloc-camion" style="display:none;">
+            <div class="field">
+              <label class="field-label">Charge utile</label>
+              <input 
+                class="field-input" 
+                type="number" 
+                name="chargeUtile" 
+                min="0" 
+                placeholder="Ex: 12000 kg"
+                oninput="checkFilled(this)"
+              >
+            </div>
+
+            <div class="field">
+              <label class="field-label">Volume utile</label>
+              <input 
+                class="field-input" 
+                type="number" 
+                name="volumeUtile" 
+                min="0" 
+                placeholder="Ex: 35 m³"
+                oninput="checkFilled(this)"
+              >
+            </div>
+          </div>
         </div>
+
+        
 
         <div class="actions">
           <button type="button" class="btn-prev" onclick="goStep(1)">
@@ -1036,7 +1187,7 @@ VALUES
             <label class="field-label">Description détaillée <span class="req">*</span></label>
             <textarea class="field-textarea" name="description" id="f-desc" maxlength="2000" placeholder="Décrivez l'état général, l'historique, les équipements particuliers, l'entretien..." oninput="updateCounter('f-desc', 'desc-counter', 2000)"></textarea>
             <div class="field-hint">
-              <span>Min. 50 caractères · Plus c'est détaillé, plus vous attirez d'acheteurs sérieux</span>
+              <span>Min. 50 caractères · Mentionnez l'entretien, les défauts, les frais récents</span>
               <span><span id="desc-counter">0</span>/2000</span>
             </div>
           </div>
@@ -1045,7 +1196,7 @@ VALUES
         <div class="form-card">
           <div class="form-card-h">
             <div class="form-card-h-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             </div>
             <div>
               <div class="form-card-h-title">Équipements & options</div>
@@ -1055,81 +1206,29 @@ VALUES
 
           <div class="options-subtitle">Confort</div>
           <div class="options-grid">
-            <label class="option"><input type="checkbox" name="equipements[]" value="Climatisation"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Climatisation</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Clim auto bi-zone"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Clim auto bi-zone</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Sièges cuir"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Sièges cuir</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Sièges chauffants"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Sièges chauffants</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Sièges électriques"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Sièges électriques</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Toit ouvrant"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Toit ouvrant</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Toit panoramique"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Toit panoramique</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Volant cuir"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Volant cuir</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Démarrage bouton"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Démarrage bouton</label>
+            <?php
+            $opts = ['Climatisation','Clim auto','Sièges cuir','Sièges chauffants','Toit ouvrant','Vitres électriques'];
+            foreach ($opts as $op): ?>
+              <label class="option"><input type="checkbox" name="equipements[]" value="<?= htmlspecialchars($op) ?>"><span class="cb">✓</span><?= htmlspecialchars($op) ?></label>
+            <?php endforeach; ?>
           </div>
 
-          <div class="options-subtitle">Multimédia</div>
+          <div class="options-subtitle">Technologie</div>
           <div class="options-grid">
-            <label class="option"><input type="checkbox" name="equipements[]" value="GPS"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>GPS / Navigation</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Bluetooth"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Bluetooth</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Apple CarPlay"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Apple CarPlay</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Android Auto"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Android Auto</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Écran tactile"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Écran tactile</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Prise USB"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Prise USB</label>
+            <?php
+            $opts = ['GPS / Navigation','Bluetooth','Apple CarPlay','Android Auto','Caméra de recul','Radar de recul'];
+            foreach ($opts as $op): ?>
+              <label class="option"><input type="checkbox" name="equipements[]" value="<?= htmlspecialchars($op) ?>"><span class="cb">✓</span><?= htmlspecialchars($op) ?></label>
+            <?php endforeach; ?>
           </div>
 
-          <div class="options-subtitle">Sécurité & conduite</div>
+          <div class="options-subtitle">Sécurité</div>
           <div class="options-grid">
-            <label class="option"><input type="checkbox" name="equipements[]" value="Caméra de recul"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Caméra de recul</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Radar avant"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Radar avant</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Radar arrière"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Radar arrière</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Régulateur vitesse"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Régulateur</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="ABS"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>ABS</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="ESP"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>ESP</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Airbags"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Airbags</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Phares LED"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Phares LED</label>
-            <label class="option"><input type="checkbox" name="equipements[]" value="Jantes alu"><span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>Jantes alu</label>
-          </div>
-        </div>
-
-        <div class="form-card">
-          <div class="form-card-h">
-            <div class="form-card-h-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.999 6.059 17.5 2 12 2z"/></svg>
-            </div>
-            <div>
-              <div class="form-card-h-title">Couleurs</div>
-              <div class="form-card-h-sub">Sélectionnez les couleurs du véhicule</div>
-            </div>
-          </div>
-
-          <div class="field">
-            <label class="field-label">Couleur extérieure</label>
-            <input type="hidden" name="couleur_ext" id="couleur-ext-input">
-            <div class="color-grid">
-              <div class="color-pick" data-color="Noir" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#1a1a18"></div>Noir</div>
-              <div class="color-pick" data-color="Blanc" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#fff;border:1px solid #ccc"></div>Blanc</div>
-              <div class="color-pick" data-color="Gris" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#9ca3af"></div>Gris</div>
-              <div class="color-pick" data-color="Argent" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:linear-gradient(135deg,#f7f7f7,#aaa)"></div>Argent</div>
-              <div class="color-pick" data-color="Rouge" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#dc2626"></div>Rouge</div>
-              <div class="color-pick" data-color="Bleu" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#185FA5"></div>Bleu</div>
-              <div class="color-pick" data-color="Vert" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#16a34a"></div>Vert</div>
-              <div class="color-pick" data-color="Jaune" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#facc15"></div>Jaune</div>
-              <div class="color-pick" data-color="Orange" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#f97316"></div>Orange</div>
-              <div class="color-pick" data-color="Marron" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#78350f"></div>Marron</div>
-              <div class="color-pick" data-color="Beige" data-target="couleur-ext-input" onclick="selectColor(this)"><div class="color-dot" style="background:#d6b47b"></div>Beige</div>
-            </div>
-          </div>
-
-          <div class="field" style="margin-bottom:0">
-            <label class="field-label">Couleur intérieure</label>
-            <input type="hidden" name="couleur_int" id="couleur-int-input">
-            <div class="color-grid">
-              <div class="color-pick" data-color="Noir" data-target="couleur-int-input" onclick="selectColor(this)"><div class="color-dot" style="background:#1a1a18"></div>Noir</div>
-              <div class="color-pick" data-color="Gris" data-target="couleur-int-input" onclick="selectColor(this)"><div class="color-dot" style="background:#9ca3af"></div>Gris</div>
-              <div class="color-pick" data-color="Beige" data-target="couleur-int-input" onclick="selectColor(this)"><div class="color-dot" style="background:#d6b47b"></div>Beige</div>
-              <div class="color-pick" data-color="Marron" data-target="couleur-int-input" onclick="selectColor(this)"><div class="color-dot" style="background:#78350f"></div>Marron</div>
-              <div class="color-pick" data-color="Rouge" data-target="couleur-int-input" onclick="selectColor(this)"><div class="color-dot" style="background:#dc2626"></div>Rouge</div>
-              <div class="color-pick" data-color="Blanc" data-target="couleur-int-input" onclick="selectColor(this)"><div class="color-dot" style="background:#fff;border:1px solid #ccc"></div>Blanc</div>
-            </div>
+            <?php
+            $opts = ['ABS','ESP','Airbags','Régulateur de vitesse','Aide au stationnement','Feux LED'];
+            foreach ($opts as $op): ?>
+              <label class="option"><input type="checkbox" name="equipements[]" value="<?= htmlspecialchars($op) ?>"><span class="cb">✓</span><?= htmlspecialchars($op) ?></label>
+            <?php endforeach; ?>
           </div>
         </div>
 
@@ -1145,7 +1244,6 @@ VALUES
         </div>
       </div>
 
-
       <!-- ETAPE 4 : PRIX & CONDITIONS -->
       <div class="step-content" data-step-content="4">
         <div class="step-banner">
@@ -1159,19 +1257,39 @@ VALUES
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             </div>
             <div>
-              <div class="form-card-h-title">Prix de vente <span class="req">*</span></div>
-              <div class="form-card-h-sub">Indiquez le montant souhaité en dinars algériens</div>
+              <div class="form-card-h-title" id="price-label">Prix de vente <span class="req">*</span></div>
+              <div class="form-card-h-sub" id="price-subtitle">Indiquez le montant souhaité en dinars algériens</div>
             </div>
           </div>
 
           <div class="price-row">
             <div class="price-input-wrap">
               <input type="number" name="prix" id="f-prix" min="0" step="1000" placeholder="0" oninput="checkPrice()">
-              <span class="price-unit">DA</span>
+              <span class="price-unit" id="price-unit">DA</span>
             </div>
           </div>
 
-          <div class="price-toggles">
+          <div id="bloc-location" style="display:none; margin-top:14px;">
+            <div class="grid-2">
+              <div class="field">
+                <label class="field-label">Caution</label>
+                <div class="input-unit-wrap">
+                  <input class="field-input" type="number" name="caution" id="f-caution" min="0" step="1000" placeholder="Ex: 50000" oninput="checkFilled(this)">
+                  <span class="input-unit">DA</span>
+                </div>
+              </div>
+
+              <div class="field">
+                <label class="field-label">Type de tarif</label>
+                <select class="field-select" name="tarificationLocation" id="f-tarification-location" onchange="adapterUniteLocation(); checkFilled(this)">
+                  <option value="jour">Prix par jour</option>
+                  <option value="km">Prix par kilomètre</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="price-toggles" id="bloc-options-vente">
             <label class="price-chip">
               <input type="checkbox" name="negociable">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6l3 3l3-3"/><path d="M3 12l3 3l3-3"/><path d="M3 18l3 3l3-3"/></svg>
@@ -1253,11 +1371,11 @@ VALUES
         </div>
       </div>
 
-      <!-- ETAPE 5 : APERCU & PUBLIER -->
+      <!-- ETAPE 5 : APERCU -->
       <div class="step-content" data-step-content="5">
         <div class="step-banner">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-          Vérifiez les informations puis publiez votre annonce
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          Vérifiez toutes les informations avant publication. Vous pourrez modifier l'annonce après validation.
         </div>
 
         <div class="form-card">
@@ -1267,17 +1385,17 @@ VALUES
             </div>
             <div>
               <div class="form-card-h-title">Aperçu de votre annonce</div>
-              <div class="form-card-h-sub">Voici comment elle apparaîtra dans les résultats de recherche</div>
+              <div class="form-card-h-sub">Voici comment votre annonce apparaîtra aux acheteurs</div>
             </div>
           </div>
 
           <div class="preview-card">
             <div class="preview-img" id="preview-img">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.8"><rect x="1" y="6" width="22" height="13" rx="3"/><circle cx="7" cy="16" r="1.5"/><circle cx="17" cy="16" r="1.5"/></svg>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             </div>
             <div class="preview-body">
               <div class="preview-title" id="preview-title">Titre de votre annonce</div>
-              <div class="preview-sub" id="preview-sub">Type · Transmission · Puissance</div>
+              <div class="preview-sub" id="preview-sub">—</div>
               <div class="preview-price" id="preview-price">0 DA</div>
               <div class="preview-specs" id="preview-specs"></div>
             </div>
@@ -1323,132 +1441,237 @@ VALUES
     </form>
   </div>
 
-
   <script>
     /* ============================================ */
-    /* ===   DONNÉES MARQUES / MODÈLES          === */
+    /* ===   DONNÉES & ÉTAT GLOBAL               === */
     /* ============================================ */
-   const MARQUES_DB = <?= json_encode($marquesDB, JSON_UNESCAPED_UNICODE); ?>;
-
-    /* ============================================ */
-    /* ===   ÉTAT GLOBAL                         === */
-    /* ============================================ */
+    const MARQUES_DB = <?= json_encode($marquesDB, JSON_UNESCAPED_UNICODE) ?>;
     let currentStep = 1;
     let uploadedPhotos = [];
-    const totalSteps = 5;
+
+    const stepLabels = [
+      'Type de véhicule',
+      'Caractéristiques',
+      'Photos & description',
+      'Prix & conditions',
+      'Aperçu & publier'
+    ];
 
     /* ============================================ */
-    /* ===   NAVIGATION ENTRE ÉTAPES             === */
+    /* ===   NAVIGATION ÉTAPES                   === */
     /* ============================================ */
     function goStep(step) {
-      if (step > currentStep) {
-        if (!validateStep(currentStep)) return;
-      }
+      if (step > currentStep && !validateStep(currentStep)) return;
 
-      document.querySelectorAll('.step-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.step-content').forEach(c => c.classList.remove('active'));
       document.querySelector(`[data-step-content="${step}"]`).classList.add('active');
-
-      document.querySelectorAll('.step').forEach((el, i) => {
-        const stepNum = i + 1;
-        el.classList.remove('active', 'done');
-        if (stepNum < step) el.classList.add('done');
-        if (stepNum === step) el.classList.add('active');
-      });
-
-      document.querySelectorAll('.step-line').forEach((el, i) => {
-        el.classList.toggle('done', i < step - 1);
-      });
-
-      const percent = Math.round((step / totalSteps) * 100);
-      document.getElementById('progress-bar').style.width = percent + '%';
-      document.getElementById('progress-percent').textContent = percent + '% complété';
-
-      const titles = ['Type de véhicule', 'Caractéristiques', 'Photos & description', 'Prix & conditions', 'Aperçu & publier'];
-      document.getElementById('progress-step').textContent = `Étape ${step} sur ${totalSteps} — ${titles[step-1]}`;
-
       currentStep = step;
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      updateStepper();
 
       if (step === 5) updatePreview();
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateStepper() {
+      const steps = document.querySelectorAll('.stepper .step');
+      const lines = document.querySelectorAll('.stepper .step-line');
+      const percent = currentStep * 20;
+      document.getElementById('progress-bar').style.width = percent + '%';
+      document.getElementById('progress-step').textContent = `Étape ${currentStep} sur 5 — ${stepLabels[currentStep - 1]}`;
+      document.getElementById('progress-percent').textContent = percent + '% complété';
+
+      steps.forEach((el, idx) => {
+        el.classList.remove('active', 'done');
+        if (idx + 1 < currentStep) el.classList.add('done');
+        if (idx + 1 === currentStep) el.classList.add('active');
+      });
+      lines.forEach((el, idx) => el.classList.toggle('done', idx + 1 < currentStep));
     }
 
     /* ============================================ */
-    /* ===   VALIDATION PAR ÉTAPE                === */
+    /* ===   TYPE VÉHICULE                       === */
     /* ============================================ */
-    function validateStep(step) {
-      clearAlert();
-
-      if (step === 1) {
-        if (!document.getElementById('f-type').value) {
-          showAlert('error', 'Sélectionnez un type de véhicule');
-          return false;
-        }
-      }
-
-      if (step === 2) {
-        const required = ['marque', 'modele', 'annee', 'kilometrage', 'carburant', 'transmission'];
-        const labels = { marque:'Marque', modele:'Modèle', annee:'Année', kilometrage:'Kilométrage', carburant:'Carburant', transmission:'Transmission' };
-        for (const name of required) {
-          const el = document.querySelector(`[name="${name}"]`);
-          if (!el.value) {
-            el.classList.add('error');
-            el.focus();
-            showAlert('error', `Le champ "${labels[name]}" est obligatoire`);
-            return false;
-          }
-        }
-        const annee = parseInt(document.querySelector('[name="annee"]').value);
-        if (annee < 1900 || annee > 2030) {
-          showAlert('error', 'Année invalide (1900-2030)');
-          return false;
-        }
-      }
-
-      if (step === 3) {
-        if (uploadedPhotos.length === 0) {
-          showAlert('error', 'Ajoutez au moins 1 photo');
-          return false;
-        }
-        const titre = document.getElementById('f-titre').value.trim();
-        const desc = document.getElementById('f-desc').value.trim();
-        if (titre.length < 10) {
-          showAlert('error', 'Le titre doit contenir au moins 10 caractères');
-          return false;
-        }
-        if (desc.length < 50) {
-          showAlert('error', 'La description doit contenir au moins 50 caractères');
-          return false;
-        }
-      }
-
-      if (step === 4) {
-        const prix = parseFloat(document.getElementById('f-prix').value);
-        if (!prix || prix <= 0) {
-          showAlert('error', 'Le prix doit être supérieur à 0');
-          return false;
-        }
-        if (!document.getElementById('f-wilaya').value) {
-          showAlert('error', 'Sélectionnez une wilaya');
-          return false;
-        }
-        const tel = document.querySelector('[name="telephone"]').value.trim();
-        if (!tel) {
-          showAlert('error', 'Le téléphone est obligatoire');
-          return false;
-        }
-      }
-
-      return true;
+    function selectType(el) {
+      document.querySelectorAll('.type-card[data-type]').forEach(c => c.classList.remove('selected'));
+      el.classList.add('selected');
+      const type = el.dataset.type;
+      document.getElementById('f-type').value = type;
+      adapterFormulaireVehicule(type);
     }
 
-    /* ============================================ */
-    /* ===   ÉTAPE 1 : SÉLECTION TYPE            === */
-    /* ============================================ */
-    function selectType(card) {
-      document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
-      document.getElementById('f-type').value = card.dataset.type;
-      buildMarques();
+    function adapterFormulaireVehicule(type) {
+      const blocPortesPlaces = document.getElementById('bloc-portes-places');
+      const blocCamion = document.getElementById('bloc-camion');
+
+      const carburant = document.getElementById('f-carburant');
+      const transmission = document.getElementById('f-transmission');
+
+      const pageSub = document.querySelector('.page-sub');
+
+      if (!blocPortesPlaces || !blocCamion || !carburant || !transmission) {
+        return;
+      }
+
+      if (type === 'voiture') {
+        if (pageSub) pageSub.textContent = 'Vendez votre voiture en quelques minutes';
+
+        blocPortesPlaces.style.display = 'grid';
+        blocCamion.style.display = 'none';
+
+        const charge = document.querySelector('[name="chargeUtile"]');
+        const volume = document.querySelector('[name="volumeUtile"]');
+        if (charge) charge.value = '';
+        if (volume) volume.value = '';
+
+        carburant.innerHTML = `
+          <option value="">Choisir...</option>
+          <option>Essence</option>
+          <option>Diesel</option>
+          <option>GPL</option>
+          <option>Hybride</option>
+          <option>Électrique</option>
+        `;
+
+        transmission.innerHTML = `
+          <option value="">Choisir...</option>
+          <option>Manuelle</option>
+          <option>Automatique</option>
+          <option>Semi-automatique</option>
+        `;
+      }
+
+      if (type === 'moto') {
+        if (pageSub) pageSub.textContent = 'Vendez votre moto en quelques minutes';
+
+        blocPortesPlaces.style.display = 'none';
+        blocCamion.style.display = 'none';
+
+        const portes = document.querySelector('[name="portes"]');
+        const places = document.querySelector('[name="places"]');
+        const charge = document.querySelector('[name="chargeUtile"]');
+        const volume = document.querySelector('[name="volumeUtile"]');
+
+        if (portes) portes.value = '';
+        if (places) places.value = '';
+        if (charge) charge.value = '';
+        if (volume) volume.value = '';
+
+        carburant.innerHTML = `
+          <option value="">Choisir...</option>
+          <option>Essence</option>
+          <option>Électrique</option>
+        `;
+
+        transmission.innerHTML = `
+          <option value="">Choisir...</option>
+          <option>Manuelle</option>
+          <option>Automatique</option>
+        `;
+      }
+
+      if (type === 'camion') {
+        if (pageSub) pageSub.textContent = 'Vendez votre camion en quelques minutes';
+
+        blocPortesPlaces.style.display = 'none';
+        blocCamion.style.display = 'grid';
+
+        const portes = document.querySelector('[name="portes"]');
+        const places = document.querySelector('[name="places"]');
+
+        if (portes) portes.value = '';
+        if (places) places.value = '';
+
+        carburant.innerHTML = `
+          <option value="">Choisir...</option>
+          <option>Diesel</option>
+          <option>Essence</option>
+          <option>GPL</option>
+          <option>Électrique</option>
+        `;
+
+        transmission.innerHTML = `
+          <option value="">Choisir...</option>
+          <option>Manuelle</option>
+          <option>Automatique</option>
+        `;
+      }
+    }
+
+    function selectAnnonceType(el) {
+      document.querySelectorAll('[data-annonce-type]').forEach(card => {
+        card.classList.remove('selected');
+      });
+
+      el.classList.add('selected');
+
+      const typeAnnonce = el.dataset.annonceType;
+      document.getElementById('f-type-annonce').value = typeAnnonce;
+
+      adapterPrixAnnonce(typeAnnonce);
+    }
+
+    function adapterPrixAnnonce(typeAnnonce) {
+      const priceLabel = document.getElementById('price-label');
+      const priceInput = document.getElementById('f-prix');
+      const priceUnit = document.getElementById('price-unit');
+      const priceSubtitle = document.getElementById('price-subtitle');
+      const blocLocation = document.getElementById('bloc-location');
+      const blocOptionsVente = document.getElementById('bloc-options-vente');
+
+      if (!priceLabel || !priceInput || !priceUnit) return;
+
+      if (typeAnnonce === 'vente') {
+        priceLabel.innerHTML = 'Prix de vente <span class="req">*</span>';
+        if (priceSubtitle) priceSubtitle.textContent = 'Indiquez le montant souhaité en dinars algériens';
+        priceInput.placeholder = '0';
+        priceInput.step = '1000';
+        priceUnit.textContent = 'DA';
+
+        if (blocLocation) blocLocation.style.display = 'none';
+        if (blocOptionsVente) blocOptionsVente.style.display = 'flex';
+
+        const caution = document.getElementById('f-caution');
+        const tarif = document.getElementById('f-tarification-location');
+        if (caution) caution.value = '';
+        if (tarif) tarif.value = 'jour';
+      }
+
+      if (typeAnnonce === 'location') {
+        priceLabel.innerHTML = 'Prix de location <span class="req">*</span>';
+        if (priceSubtitle) priceSubtitle.textContent = 'Choisissez si le prix est par jour ou par kilomètre';
+
+        if (blocLocation) blocLocation.style.display = 'block';
+        if (blocOptionsVente) blocOptionsVente.style.display = 'none';
+
+        const negociable = document.querySelector('[name="negociable"]');
+        const credit = document.querySelector('[name="credit"]');
+        const echange = document.querySelector('[name="echange"]');
+        if (negociable) negociable.checked = false;
+        if (credit) credit.checked = false;
+        if (echange) echange.checked = false;
+
+        adapterUniteLocation();
+      }
+    }
+
+    function adapterUniteLocation() {
+      const typeAnnonce = document.getElementById('f-type-annonce')?.value || 'vente';
+      const selectTarif = document.getElementById('f-tarification-location');
+      const priceUnit = document.getElementById('price-unit');
+      const priceInput = document.getElementById('f-prix');
+
+      if (typeAnnonce !== 'location' || !selectTarif || !priceUnit || !priceInput) return;
+
+      if (selectTarif.value === 'km') {
+        priceUnit.textContent = 'DA/km';
+        priceInput.placeholder = 'Ex: 50';
+        priceInput.step = '1';
+      } else {
+        priceUnit.textContent = 'DA/jour';
+        priceInput.placeholder = 'Ex: 8000';
+        priceInput.step = '1000';
+      }
     }
 
     /* ============================================ */
@@ -1666,7 +1889,12 @@ function updateVersions() {
 
       /* Prix */
       const prix = parseFloat(data.prix || 0);
-      document.getElementById('preview-price').textContent = prix.toLocaleString('fr-FR').replace(/,/g, ' ') + ' DA';
+      const typeAnnonce = data.typeAnnonce || 'vente';
+      let unitePrix = ' DA';
+      if (typeAnnonce === 'location') {
+        unitePrix = data.tarificationLocation === 'km' ? ' DA/km' : ' DA/jour';
+      }
+      document.getElementById('preview-price').textContent = prix.toLocaleString('fr-FR').replace(/,/g, ' ') + unitePrix;
 
       /* Specs */
       const specs = document.getElementById('preview-specs');
@@ -1687,6 +1915,7 @@ function updateVersions() {
       /* RECAP CARACTÉRISTIQUES */
       const car = document.getElementById('recap-caracteristiques');
       car.innerHTML =
+        recapRow('Type annonce', cap(typeAnnonce)) +
         recapRow('Type', cap(data.type)) +
         recapRow('Marque / Modèle', `${data.marque || '—'} ${data.modele || ''} ${data.version || ''}`.trim()) +
         recapRow('Année', data.annee || '—') +
@@ -1698,6 +1927,8 @@ function updateVersions() {
         recapRow('État', cap(data.etat)) +
         (data.portes ? recapRow('Portes', data.portes) : '') +
         (data.places ? recapRow('Places', data.places) : '') +
+        (data.chargeUtile ? recapRow('Charge utile', data.chargeUtile + ' kg') : '') +
+        (data.volumeUtile ? recapRow('Volume utile', data.volumeUtile + ' m³') : '') +
         (data.couleur_ext ? recapRow('Couleur ext.', data.couleur_ext) : '') +
         (data.couleur_int ? recapRow('Couleur int.', data.couleur_int) : '');
 
@@ -1712,22 +1943,198 @@ function updateVersions() {
       /* RECAP PRIX */
       const pr = document.getElementById('recap-prix');
       const conditions = [];
-      if (data.negociable) conditions.push('Négociable');
-      if (data.credit) conditions.push('Crédit accepté');
-      if (data.echange) conditions.push('Échange possible');
 
-      pr.innerHTML =
-        recapRow('Prix', prix.toLocaleString('fr-FR').replace(/,/g, ' ') + ' DA') +
-        recapRow('Conditions', conditions.length > 0 ? conditions.join(', ') : 'Aucune') +
+      if (typeAnnonce === 'vente') {
+        if (data.negociable) conditions.push('Négociable');
+        if (data.credit) conditions.push('Crédit accepté');
+        if (data.echange) conditions.push('Échange possible');
+      }
+
+      let uniteRecap = ' DA';
+      if (typeAnnonce === 'location') {
+        uniteRecap = data.tarificationLocation === 'km' ? ' DA/km' : ' DA/jour';
+      }
+
+      let recapPrixHtml = recapRow(
+        typeAnnonce === 'location' ? 'Prix de location' : 'Prix de vente',
+        prix.toLocaleString('fr-FR').replace(/,/g, ' ') + uniteRecap
+      );
+
+      if (typeAnnonce === 'vente') {
+        recapPrixHtml += recapRow('Conditions', conditions.length > 0 ? conditions.join(', ') : 'Aucune');
+      }
+
+      if (typeAnnonce === 'location') {
+        recapPrixHtml += recapRow('Type de tarif', data.tarificationLocation === 'km' ? 'Par kilomètre' : 'Par jour');
+
+        if (data.caution) {
+          recapPrixHtml += recapRow('Caution', Number(data.caution).toLocaleString('fr-FR') + ' DA');
+        }
+      }
+
+      recapPrixHtml +=
         recapRow('Wilaya', data.wilaya || '—') +
         recapRow('Téléphone', data.telephone || '—');
+
+      pr.innerHTML = recapPrixHtml;
     }
+
 
     function recapRow(key, val) {
       return `<div class="recap-row"><span class="recap-key">${key}</span><span class="recap-val">${val}</span></div>`;
     }
     function cap(s) {
       return s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
+    }
+
+    /* ============================================ */
+    /* ===   VALIDATION DES ÉTAPES                === */
+    /* ============================================ */
+    function validateStep(step) {
+      clearAlert();
+
+      if (step === 1) {
+        const typeVehicule = document.getElementById('f-type');
+        const typeAnnonce = document.getElementById('f-type-annonce');
+
+        if (!typeVehicule || !typeVehicule.value) {
+          showAlert('error', 'Sélectionnez un type de véhicule');
+          return false;
+        }
+
+        if (!typeAnnonce || !typeAnnonce.value) {
+          showAlert('error', 'Sélectionnez un type d’annonce');
+          return false;
+        }
+      }
+
+      if (step === 2) {
+        const required = [
+          'marque',
+          'modele',
+          'annee',
+          'kilometrage',
+          'carburant',
+          'transmission'
+        ];
+
+        const labels = {
+          marque: 'Marque',
+          modele: 'Modèle',
+          annee: 'Année',
+          kilometrage: 'Kilométrage',
+          carburant: 'Carburant',
+          transmission: 'Transmission'
+        };
+
+        for (const name of required) {
+          const el = document.querySelector(`[name="${name}"]`);
+
+          if (!el || !el.value) {
+            if (el) {
+              el.classList.add('error');
+              el.focus();
+            }
+
+            showAlert('error', `Le champ "${labels[name]}" est obligatoire`);
+            return false;
+          }
+        }
+
+        const anneeEl = document.querySelector('[name="annee"]');
+        const annee = parseInt(anneeEl.value);
+
+        if (annee < 1900 || annee > 2030) {
+          showAlert('error', 'Année invalide. Elle doit être entre 1900 et 2030');
+          anneeEl.focus();
+          return false;
+        }
+
+        const typeVehicule = document.getElementById('f-type').value;
+
+        if (typeVehicule === 'camion') {
+          const chargeInput = document.querySelector('[name="chargeUtile"]');
+          const volumeInput = document.querySelector('[name="volumeUtile"]');
+
+          const charge = chargeInput ? parseInt(chargeInput.value) : 0;
+          const volume = volumeInput ? parseInt(volumeInput.value) : 0;
+
+          if (!charge || charge <= 0) {
+            showAlert('error', 'La charge utile est obligatoire pour un camion');
+            if (chargeInput) chargeInput.focus();
+            return false;
+          }
+
+          if (!volume || volume <= 0) {
+            showAlert('error', 'Le volume utile est obligatoire pour un camion');
+            if (volumeInput) volumeInput.focus();
+            return false;
+          }
+        }
+      }
+
+      if (step === 3) {
+        if (uploadedPhotos.length === 0) {
+          showAlert('error', 'Ajoutez au moins 1 photo');
+          return false;
+        }
+
+        const titre = document.getElementById('f-titre').value.trim();
+        const desc = document.getElementById('f-desc').value.trim();
+
+        if (titre.length < 10) {
+          showAlert('error', 'Le titre doit contenir au moins 10 caractères');
+          document.getElementById('f-titre').focus();
+          return false;
+        }
+
+        if (desc.length < 50) {
+          showAlert('error', 'La description doit contenir au moins 50 caractères');
+          document.getElementById('f-desc').focus();
+          return false;
+        }
+      }
+
+      if (step === 4) {
+        const prixInput = document.getElementById('f-prix');
+        const prix = parseFloat(prixInput.value);
+
+        if (!prix || prix <= 0) {
+          showAlert('error', 'Le prix doit être supérieur à 0');
+          prixInput.focus();
+          return false;
+        }
+
+        const typeAnnonce = document.getElementById('f-type-annonce').value;
+
+        if (typeAnnonce === 'location') {
+          const tarif = document.getElementById('f-tarification-location');
+
+          if (!tarif || !tarif.value) {
+            showAlert('error', 'Sélectionnez si le prix est par jour ou par kilomètre');
+            if (tarif) tarif.focus();
+            return false;
+          }
+        }
+
+        const wilaya = document.getElementById('f-wilaya');
+
+        if (!wilaya || !wilaya.value) {
+          showAlert('error', 'Sélectionnez une wilaya');
+          if (wilaya) wilaya.focus();
+          return false;
+        }
+
+        const tel = document.querySelector('[name="telephone"]');
+
+        if (!tel || !tel.value.trim()) {
+          showAlert('error', 'Le téléphone est obligatoire');
+          if (tel) tel.focus();
+          return false;
+        }
+      }
+
+      return true;
     }
 
     /* ============================================ */
@@ -1777,6 +2184,10 @@ function updateVersions() {
     /* ============================================ */
     buildMarques();
     goStep(1);
+    document.addEventListener('DOMContentLoaded', function () {
+      adapterFormulaireVehicule(document.getElementById('f-type').value || 'voiture');
+      adapterPrixAnnonce(document.getElementById('f-type-annonce').value || 'vente');
+    });
   </script>
 
 </body>
